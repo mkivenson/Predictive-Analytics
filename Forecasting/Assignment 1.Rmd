@@ -1,0 +1,328 @@
+---
+title: "Data 624 Homework 1: Time Series"
+author: "Mary Anna Kivenson"
+date: "February 9, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Time Series {.tabset .tabset-fade}
+
+```{r message=FALSE, warning=FALSE}
+library(fpp2)
+library(zoo)
+library(plotly)
+```
+
+## Question 2.1
+Use the help function to explore what the series `gold`, `woolyrnq` and `gas` represent.
+
+a) Use `autoplot()` to plot each of these in separate plots.
+
+```{r}
+data(gold)
+autoplot(gold)
+```
+
+```{r}
+data(woolyrnq)
+autoplot(woolyrnq)
+```
+
+```{r}
+data(gas)
+autoplot(gas)
+```
+
+
+b) What is the frequency of each series? Hint: apply the `frequency()` function.
+
+```{r}
+frequency(gold)
+```
+
+```{r}
+frequency(woolyrnq)
+```
+
+```{r}
+frequency(gas)
+```
+
+c) Use `which.max()` to spot the outlier in the gold series. Which observation was it?
+
+```{r}
+#position of the outlier
+which.max(gold)
+
+#value of the outlier
+gold[which.max(gold)]
+```
+
+
+## Question 2.2
+
+Download the file `tute1.csv` from the (http://otexts.com/fpp2/extrafiles/tute1.csv)[book website], open it in Excel (or some other spreadsheet application), and review its contents. You should find four columns of information. Columns B through D each contain a quarterly series, labelled Sales, AdBudget and GDP. Sales contains the quarterly sales for a small company over the period 1981-2005. AdBudget is the advertising budget and GDP is the gross domestic product. All series have been adjusted for inflation.
+
+a) You can read the data into R with the following script:
+
+
+```{r}
+tute1 <- read.csv("http://otexts.com/fpp2/extrafiles/tute1.csv", header=TRUE)
+head(tute1)
+```
+
+b) Convert the data to time series
+
+```{r}
+mytimeseries <- ts(tute1[,-1], start=1981, frequency=4)
+#(The [,-1] removes the first column which contains the quarters as we don’t need them now.)
+```
+
+c) Construct time series plots of each of the three series
+
+```{r}
+autoplot(mytimeseries, facets=TRUE)
+#Check what happens when you don’t include facets=TRUE.
+```
+
+## Question 2.3  {.tabset .tabset-fade}
+
+Download some monthly Australian retail data from the (https://otexts.com/fpp2/extrafiles/retail.xlsx)[book website]. These represent retail sales in various categories for different Australian states, and are stored in a MS-Excel file.
+
+a) You can read the data into R with the following script:
+
+```{r message=FALSE, warning=FALSE}
+temp = tempfile(fileext = ".xlsx")
+dataURL <- "https://otexts.com/fpp2/extrafiles/retail.xlsx"
+download.file(dataURL, destfile=temp, mode='wb')
+
+retaildata <- readxl::read_excel(temp, skip=1)
+#The second argument (skip=1) is required because the Excel sheet has two header rows.
+head(retaildata)
+```
+
+
+b) Select one of the time series as follows (but replace the column name with your own chosen column):
+
+```{r}
+myts <- ts(retaildata[,"A3349396W"], frequency=12, start=c(1982,4))
+```
+
+
+c) Explore your chosen retail time series using the following functions:
+`autoplot()`, `ggseasonplot()`, `ggsubseriesplot()`, `gglagplot()`, `ggAcf()`
+
+Can you spot any seasonality, cyclicity and trend? What do you learn about the series?
+
+#### Time Plot
+
+The time plot shows:
+* Annual seasonality, with a peak in December and a low in February
+* A consistent upwards trend
+* No evidence of cyclic behavior
+
+```{r}
+theme_set(theme_light(base_size = 12))
+p <- autoplot(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+ggplotly(p)
+```
+
+#### Season Plot
+The seasonal plot confirms the seasonality and upwards trend found in the time plot. It also shows that the upwards trend has been accelerating.
+
+```{r}
+ggseasonplot(myts, polar = TRUE) + ggtitle("Retail Data A3349396W") + xlab("Year")
+```
+
+#### Season Subseries Plot
+This subseries plot confirms the upwards trend and the peak that we see in Decmeber and the trough that occurs in February. Other than this, the subseries plot for this time series des not tell us much. 
+```{r}
+ggsubseriesplot(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+```
+
+#### Lag Plot
+
+The lagplot has the strongest linear relationship at lag 12, confirming that the data has annual seasonality. However, it also shows a positive linear relationship for most of the lag plots. This is because the time series is nearly always increasing. 
+```{r}
+gglagplot(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+
+```
+
+#### Correlogram
+The autocorrelation plot has r12 slightly higher than the other lags, due to the annual seasonal pattern in the data. All lags are higher than the dashed blue lines, which indicates the correlations are significantly different then 0. 
+```{r}
+ggAcf(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+```
+
+Each of these plots has confirmed that the series has an annual seasonality and an upwards trend. 
+
+###
+
+## Question 2.6 
+
+Use the following graphics functions: `autoplot()`, `ggseasonplot()`, `ggsubseriesplot()`, `gglagplot()`, `ggAcf()` and explore features from the following time series: `hsales`, `usdeaths`, `bricksq`, `sunspotarea`, `gasoline`.
+
+Can you spot any seasonality, cyclicity and trend?
+What do you learn about the series?
+
+### hsales {.tabset .tabset-fade}
+
+These plots have indicated that the series has an annual seasonality and is strongly dependent on the previous month of data. There is also some evidence of cyclical behavior every 6-9 years.
+
+#### Time Plot
+
+The time plot shows:
+* Annual seasonality, with a peak in February and a trough in December
+* No evidence of a trend
+* Cyclic behaviour every 6-9 years
+
+```{r}
+theme_set(theme_light(base_size = 12))
+p <- autoplot(hsales) + ggtitle("hsales") + xlab("Year")
+ggplotly(p)
+```
+
+#### Season Plot
+The seasonal plot confirms the seasonality. It also reveals a peak in March and trough in December. 
+
+```{r}
+ggseasonplot(hsales, polar = FALSE) + ggtitle("hsales") + xlab("Year")
+```
+
+#### Season Subseries Plot
+This subseries plot shows the seasonal behavior of the time series (increasing from January - March, decreasing from March - December).
+
+```{r}
+ggsubseriesplot(hsales) + ggtitle("hsales") + xlab("Year")
+```
+
+#### Lag Plot
+
+The lagplot has the strongest linear relationship at lag 1 and the linear relationship continues to weaken as the lag continues until lag 12, when it becomes somewhat linear. 
+This reflects that this time series has some annual seasonality, but mainly depends on the previous month of data.  
+```{r}
+gglagplot(hsales) + ggtitle("hsales") + xlab("Year")
+
+```
+
+#### Correlogram
+The autocorrelation plot has r12 higher than the other lags, due to the annual seasonal pattern in the data. Even higher is r1, which confirms that the previous month in the time series is indicative of the next. All lags except 16 - 22 are higher than the dashed blue lines, which indicates the correlations are significantly different then 0. 
+```{r}
+ggAcf(hsales) + ggtitle("hsales") + xlab("Year")
+```
+
+###
+
+### usdeaths
+
+### bricksq
+
+### sunspotarea
+
+### gasoline
+
+
+## Notes
+
+### What can be forecast?
+
+The predicatability of an event or quantity depends on several factors:
+
+1. how well we understand the factors that contribute to it
+2. how much data is available
+3. whether the forecasts can affect the thing we are trying to forecast
+
+
+Forecasting methods depend on what data are available and the predicability of the quantity to be forecast. Methods include:
+1. Naive method - Using the most recent observation as a forecast
+2. Judgemental forecasting - For when historic data is not available. More accurate when the forcaster has important domain knowledge and more up-to-date data. 
+
+
+### Forecasting, planning, and goals
+
+**Forecasting** Predicting the future as accurately as possible, using historical data and knowledge of future events. May be short-term (ex - scheduling, demand), medium-term (ex-  resource requirements), or long-term (ex - strategic planning).
+
+**Goals** Events that we would like to happen
+
+**Planning** A response to forecast and goals
+
+
+### Determining what to forecast
+
+* What is the forecasting horizon?
+* What forecasting frequency is needed?
+* What data is needed for the forecast?
+
+### Forecasting data and methods
+
+* Qualitative forecasting - Methods needed when data is not available or is not relevant. 
+* Quantitative forecasting - Can be applied when numerical information about the past is available, and past patterns will continue.
+* Time series model - Uses only information on the variable, no factors that affect its behavior (ex - decomposition, exponential smoothing, ARIMA)
+* Explanatory model - A model with predictor variables
+* Mixed models - Combine the features of both models
+
+
+### The basic steps in a forecasting task
+
+1. Problem Definition (how will forcasts be used and by who?)
+2. Gathering information (statistical data and expertise)
+3. Exploratory analysis (are there patterns/trend/seasonality/business cycle? are there realtionships amoung variables?)
+4. Choosing and fitting models (compare multiple potential models, depends on data availability and strength of relationships between forecast variable and exploratory variables)
+5. Using and evaluating a forecasting model
+
+### The statistical forecasting perspective
+
+* Consider a forecast to be a random variable
+* The proability distribution of the random variable is the forecast distribution
+
+### `ts` objects
+
+Time series can be stored as a `ts` object in R.
+
+* Frequency of a time series - number of observations before the seasonal pattern repears (annual, quarterly, monthly, weekly)
+
+### Time plots
+
+* Use `autoplot` in R to visualize
+
+### Time series patterns
+
+* Trend - long-term increase or decrease in the data
+* Seasonal - time series affected by seasonal factors such as time of year or day of week
+* Cyclic - fluctuations in data that are not of a fixed frequency
+
+### Seasonal plots
+
+Seasonal plots show data plotted against individual seasons to help better identify underlying seasonal patterns and see where the pattern changes.
+Option - set polar = TRUE to see plot on polar coordinates.
+
+### Seasonal subseries plots
+
+Plot where the data for each season are collected in separate mini time plots.
+
+### Scatterplots
+
+Used to see relatonships between predictor variables.
+* Facet by a feature
+* Find correlation between two time series
+* Correlation matrix
+
+
+### Lag plots
+
+Note - The kth lag is the time period that happened k time periods before time i. Helpful in identifying seasonality.  
+
+### Autocorrelation
+
+Autocorrelation measures the linear relationship between lagged values of a time series. 
+* When data have a trend, autocorrelations for small lags tend to be large and positive
+* When data are seasonal, autocorrelations will be larger at multiples of the seasonal frequency
+* Wehn both, autocorrelations will have a combination of these
+
+### White noise
+
+White noise - time series that show no autocorrelation.

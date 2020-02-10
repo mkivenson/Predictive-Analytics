@@ -20,25 +20,34 @@ library(plotly)
 ## Question 2.1
 Use the help function to explore what the series `gold`, `woolyrnq` and `gas` represent.
 
-a) Use `autoplot()` to plot each of these in separate plots.
+* `gold`: Daily morning gold prices in US dollars. 1 January 1985 – 31 March 1989.
+* `woolrnq`: Quarterly production of woollen yarn in Australia: tonnes. Mar 1965 – Sep 1994.
+* `gas`: Australian monthly gas production: 1956–1995.
+
+
+### Part A
+
+Use `autoplot()` to plot each of these in separate plots.
 
 ```{r}
 data(gold)
-autoplot(gold)
+ggplotly(autoplot(gold))
 ```
 
 ```{r}
 data(woolyrnq)
-autoplot(woolyrnq)
+ggplotly(autoplot(woolyrnq))
 ```
 
 ```{r}
 data(gas)
-autoplot(gas)
+ggplotly(autoplot(gas))
 ```
 
 
-b) What is the frequency of each series? Hint: apply the `frequency()` function.
+### Part B
+
+What is the frequency of each series? Hint: apply the `frequency()` function.
 
 ```{r}
 frequency(gold)
@@ -52,7 +61,9 @@ frequency(woolyrnq)
 frequency(gas)
 ```
 
-c) Use `which.max()` to spot the outlier in the gold series. Which observation was it?
+### Part C
+
+Use `which.max()` to spot the outlier in the gold series. Which observation was it?
 
 ```{r}
 #position of the outlier
@@ -65,9 +76,12 @@ gold[which.max(gold)]
 
 ## Question 2.2
 
-Download the file `tute1.csv` from the (http://otexts.com/fpp2/extrafiles/tute1.csv)[book website], open it in Excel (or some other spreadsheet application), and review its contents. You should find four columns of information. Columns B through D each contain a quarterly series, labelled Sales, AdBudget and GDP. Sales contains the quarterly sales for a small company over the period 1981-2005. AdBudget is the advertising budget and GDP is the gross domestic product. All series have been adjusted for inflation.
+Download the file `tute1.csv` from the [book website](http://otexts.com/fpp2/extrafiles/tute1.csv), open it in Excel (or some other spreadsheet application), and review its contents. You should find four columns of information. Columns B through D each contain a quarterly series, labelled Sales, AdBudget and GDP. Sales contains the quarterly sales for a small company over the period 1981-2005. AdBudget is the advertising budget and GDP is the gross domestic product. All series have been adjusted for inflation.
 
-a) You can read the data into R with the following script:
+
+### Part A
+
+You can read the data into R with the following script:
 
 
 ```{r}
@@ -75,25 +89,31 @@ tute1 <- read.csv("http://otexts.com/fpp2/extrafiles/tute1.csv", header=TRUE)
 head(tute1)
 ```
 
-b) Convert the data to time series
+### Part B
+
+Convert the data to time series
 
 ```{r}
 mytimeseries <- ts(tute1[,-1], start=1981, frequency=4)
 #(The [,-1] removes the first column which contains the quarters as we don’t need them now.)
 ```
 
-c) Construct time series plots of each of the three series
+
+### Part C
+
+Construct time series plots of each of the three series
 
 ```{r}
-autoplot(mytimeseries, facets=TRUE)
-#Check what happens when you don’t include facets=TRUE.
+ggplotly(autoplot(mytimeseries, facets=TRUE))
 ```
 
-## Question 2.3  {.tabset .tabset-fade}
+## Question 2.3
 
-Download some monthly Australian retail data from the (https://otexts.com/fpp2/extrafiles/retail.xlsx)[book website]. These represent retail sales in various categories for different Australian states, and are stored in a MS-Excel file.
+Download some monthly Australian retail data from the [book website](https://otexts.com/fpp2/extrafiles/retail.xlsx). These represent retail sales in various categories for different Australian states, and are stored in a MS-Excel file.
 
-a) You can read the data into R with the following script:
+### Part A
+
+You can read the data into R with the following script:
 
 ```{r message=FALSE, warning=FALSE}
 temp = tempfile(fileext = ".xlsx")
@@ -102,18 +122,22 @@ download.file(dataURL, destfile=temp, mode='wb')
 
 retaildata <- readxl::read_excel(temp, skip=1)
 #The second argument (skip=1) is required because the Excel sheet has two header rows.
-head(retaildata)
+head(retaildata[,"A3349396W"])
 ```
 
 
-b) Select one of the time series as follows (but replace the column name with your own chosen column):
+### Part B
+
+Select one of the time series as follows (but replace the column name with your own chosen column):
 
 ```{r}
 myts <- ts(retaildata[,"A3349396W"], frequency=12, start=c(1982,4))
 ```
 
 
-c) Explore your chosen retail time series using the following functions:
+### Part C   {.tabset .tabset-fade}
+
+Explore your chosen retail time series using the following functions:
 `autoplot()`, `ggseasonplot()`, `ggsubseriesplot()`, `gglagplot()`, `ggAcf()`
 
 Can you spot any seasonality, cyclicity and trend? What do you learn about the series?
@@ -121,13 +145,14 @@ Can you spot any seasonality, cyclicity and trend? What do you learn about the s
 #### Time Plot
 
 The time plot shows:
+
 * Annual seasonality, with a peak in December and a low in February
 * A consistent upwards trend
 * No evidence of cyclic behavior
 
 ```{r}
 theme_set(theme_light(base_size = 12))
-p <- autoplot(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+p <- autoplot(myts) + ggtitle("Retail Data A3349396W time plot")
 ggplotly(p)
 ```
 
@@ -135,27 +160,27 @@ ggplotly(p)
 The seasonal plot confirms the seasonality and upwards trend found in the time plot. It also shows that the upwards trend has been accelerating.
 
 ```{r}
-ggseasonplot(myts, polar = TRUE) + ggtitle("Retail Data A3349396W") + xlab("Year")
+ggseasonplot(myts, polar = TRUE) + ggtitle("Retail Data A3349396W season plot")
 ```
 
 #### Season Subseries Plot
 This subseries plot confirms the upwards trend and the peak that we see in Decmeber and the trough that occurs in February. Other than this, the subseries plot for this time series des not tell us much. 
 ```{r}
-ggsubseriesplot(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+ggsubseriesplot(myts) + ggtitle("Retail Data A3349396W season subseries plot")
 ```
 
 #### Lag Plot
 
 The lagplot has the strongest linear relationship at lag 12, confirming that the data has annual seasonality. However, it also shows a positive linear relationship for most of the lag plots. This is because the time series is nearly always increasing. 
 ```{r}
-gglagplot(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+gglagplot(myts) + ggtitle("Retail Data A3349396W lag plot")
 
 ```
 
 #### Correlogram
 The autocorrelation plot has r12 slightly higher than the other lags, due to the annual seasonal pattern in the data. All lags are higher than the dashed blue lines, which indicates the correlations are significantly different then 0. 
 ```{r}
-ggAcf(myts) + ggtitle("Retail Data A3349396W") + xlab("Year")
+ggAcf(myts) + ggtitle("Retail Data A3349396W autocorrelation plot")
 ```
 
 Each of these plots has confirmed that the series has an annual seasonality and an upwards trend. 
@@ -171,18 +196,21 @@ What do you learn about the series?
 
 ### hsales {.tabset .tabset-fade}
 
+Monthly sales of new one-family houses sold in the USA since 1973.
+
 These plots have indicated that the series has an annual seasonality and is strongly dependent on the previous month of data. There is also some evidence of cyclical behavior every 6-9 years.
 
 #### Time Plot
 
 The time plot shows:
+
 * Annual seasonality, with a peak in February and a trough in December
 * No evidence of a trend
 * Cyclic behaviour every 6-9 years
 
 ```{r}
 theme_set(theme_light(base_size = 12))
-p <- autoplot(hsales) + ggtitle("hsales") + xlab("Year")
+p <- autoplot(hsales) + ggtitle("hsales time plot")
 ggplotly(p)
 ```
 
@@ -190,14 +218,14 @@ ggplotly(p)
 The seasonal plot confirms the seasonality. It also reveals a peak in March and trough in December. 
 
 ```{r}
-ggseasonplot(hsales, polar = FALSE) + ggtitle("hsales") + xlab("Year")
+ggseasonplot(hsales, polar = FALSE) + ggtitle("hsales season plot")
 ```
 
 #### Season Subseries Plot
 This subseries plot shows the seasonal behavior of the time series (increasing from January - March, decreasing from March - December).
 
 ```{r}
-ggsubseriesplot(hsales) + ggtitle("hsales") + xlab("Year")
+ggsubseriesplot(hsales) + ggtitle("hsales season subseries plot")
 ```
 
 #### Lag Plot
@@ -205,28 +233,220 @@ ggsubseriesplot(hsales) + ggtitle("hsales") + xlab("Year")
 The lagplot has the strongest linear relationship at lag 1 and the linear relationship continues to weaken as the lag continues until lag 12, when it becomes somewhat linear. 
 This reflects that this time series has some annual seasonality, but mainly depends on the previous month of data.  
 ```{r}
-gglagplot(hsales) + ggtitle("hsales") + xlab("Year")
+gglagplot(hsales) + ggtitle("hsales lag plot")
 
 ```
 
 #### Correlogram
 The autocorrelation plot has r12 higher than the other lags, due to the annual seasonal pattern in the data. Even higher is r1, which confirms that the previous month in the time series is indicative of the next. All lags except 16 - 22 are higher than the dashed blue lines, which indicates the correlations are significantly different then 0. 
 ```{r}
-ggAcf(hsales) + ggtitle("hsales") + xlab("Year")
+ggAcf(hsales) + ggtitle("hsales autocorrelation plot")
 ```
 
 ###
 
-### usdeaths
+### usdeaths {.tabset .tabset-fade}
 
-### bricksq
+Monthly accidental deaths in USA.
 
-### sunspotarea
+These plots have indicated that the series has an annual seasonality with a peak in June and a trough in February. There is no significant evidence of trend or cyclic behavior.
 
-### gasoline
+#### Time Plot
+
+The time plot shows:
+
+* Annual seasonality, with a peak in July and a trough in February
+* No evidence of a trend (only five years of data, may be trend if more data was provided)
+* No evidence of cyclic behavior
+
+```{r}
+theme_set(theme_light(base_size = 12))
+p <- autoplot(usdeaths) + ggtitle("usdeaths time plot")
+ggplotly(p)
+```
+
+#### Season Plot
+The seasonal plot confirms the annual seasonality. It also hits at a downward trend, but there is not enough data to confirm. 
+
+```{r}
+ggseasonplot(usdeaths, polar = TRUE) + ggtitle("usdeaths season plot")
+```
+
+#### Season Subseries Plot
+This subseries plot shows the seasonal behavior of the time series (decreasing from July - February, decreasing from February - July).
+
+```{r}
+ggsubseriesplot(usdeaths) + ggtitle("usdeaths season subseries plot")
+```
+
+#### Lag Plot
+
+The lagplot has the strongest linear relationship at lag 12, confirming the annual seasonality present in the time series.  
+```{r}
+gglagplot(usdeaths) + ggtitle("usdeaths lag plot")
+
+```
+
+#### Correlogram
+The autocorrelation plot has r12 higher than the other lags, due to the annual seasonal pattern in the data. Even higher is r1, which shows that the previous month in the time series is indicative of the next. r6 and r18 show strong negative correlations, which further confirm the annual seasonality. 
+```{r}
+ggAcf(usdeaths) + ggtitle("usdeaths autocorrelation plot")
+```
+
+###
 
 
-## Notes
+### bricksq {.tabset .tabset-fade}
+
+Australian quarterly clay brick production: 1956–1994.
+
+
+These plots have indicated that the series has an annual seasonality and an upwards trend. There is also evidence of cyclic behavior every 8 years.
+
+#### Time Plot
+
+The time plot shows:
+
+* Annual seasonality, with a peak in Q3 and a trough in Q1
+* Generally upwards trend
+* Cyclic behaviour every 8 years
+
+```{r}
+theme_set(theme_light(base_size = 12))
+p <- autoplot(bricksq) + ggtitle("bricksq time plot")
+ggplotly(p)
+```
+
+#### Season Plot
+The seasonal plot confirms the seasonality. It also confirms the trough in Q1 and peak in Q3, as well as the upwards trend. 
+
+```{r}
+ggseasonplot(bricksq, polar = TRUE) + ggtitle("bricksq season plot")
+```
+
+#### Season Subseries Plot
+This subseries plot doesn't tell us too much about seasonality, but it does show that the rises and falls in the time series are consistent across quarters. 
+
+```{r}
+ggsubseriesplot(bricksq) + ggtitle("bricksq season subseries plot")
+```
+
+#### Lag Plot
+
+The lagplot has the strongest linear relationship at lag 1, but all the lag plots are somewhat linear (with increased variability at higher values).
+
+```{r}
+gglagplot(bricksq) + ggtitle("bricksq lag plot")
+
+```
+
+#### Correlogram
+The autocorrelation plot has peaks at r4, r8, r12 due to the annual seasonal pattern in the data. Even higher is r1, which confirms that the previous quarter in the time series is indicative of the next. All lags are higher than the dashed blue lines, which indicates the correlations are positive and significantly different then 0. 
+```{r}
+ggAcf(bricksq) + ggtitle("bricksq autocorrelation plot")
+```
+
+###
+
+
+### sunspotarea {.tabset .tabset-fade}
+
+Annual averages of the daily sunspot areas (in units of millionths of a hemisphere) for the full sun. Sunspots are magnetic regions that appear as dark spots on the surface of the sun. The Royal Greenwich Observatory compiled daily sunspot observations from May 1874 to 1976. Later data are from the US Air Force and the US National Oceanic and Atmospheric Administration. The data have been calibrated to be consistent across the whole history of observations.
+
+These plots have indicated that the series only showcases cyclic behavior every ~10-12 years.
+
+#### Time Plot
+
+The time plot shows:
+
+* No evidence of seasonality
+* No evidence of a trend
+* Cyclic behaviour every 10-12 years
+
+```{r}
+theme_set(theme_light(base_size = 12))
+p <- autoplot(sunspotarea) + ggtitle("sunspotarea time plot")
+ggplotly(p)
+```
+
+#### Season Plot
+Data are not seasonal
+
+
+#### Season Subseries Plot
+Data are not seasonal
+
+
+#### Lag Plot
+
+The lagplot has the strongest linear relationship at lag 10 - this is further confirmation that the data is cyclic (on a 10 - 12 year period).  
+```{r}
+gglagplot(sunspotarea, lag = 12) + ggtitle("sunspotarea lag plot")
+
+```
+
+#### Correlogram
+The autocorrelation plot has positive correlation peaks at r1, r10, r21, and r33. Negative correlation peaks occur at r5, r16, and r17. This confirms that each cycle is 10 - 12 years. 
+```{r}
+ggAcf(sunspotarea, lag.max = 36) + ggtitle("sunspotarea autocorrelation plot")
+```
+
+###
+
+
+### gasoline {.tabset .tabset-fade}
+
+These plots have indicated that the series has an annual seasonality and has a mostly upwards trend. No evidence of cyclic behavior was seen.
+
+
+#### Time Plot
+
+The time plot shows:
+
+* Annual seasonality
+* Generally upwards trend
+* No evidence of cyclic behavior
+
+```{r}
+theme_set(theme_light(base_size = 12))
+p <- autoplot(gasoline) + ggtitle("gasoline time plot")
+ggplotly(p)
+```
+
+#### Season Plot
+The seasonal plot confirms the weekly seasonality and upwards trend. It also reveals a peak in weeks 30 - 39 and a trough during weeks 5 - 11. 
+
+```{r}
+ggseasonplot(gasoline, polar = TRUE) + ggtitle("gasoline season plot")
+```
+
+#### Season Subseries Plot
+Since there are not exactly 52 weeks in a year, the frequency is non-integer and the plot produces an error.
+```{r}
+#ggsubseriesplot(gasoline, frequency = 52) + ggtitle("gasoline season subseries plot")
+```
+
+#### Lag Plot
+
+The lagplot has the strongest linear relationship at lag 1 and the linear relationship continues to weaken as the lag continues. 
+This reflects that this time series mainly depends on the previous week of data.  
+```{r}
+gglagplot(gasoline) + ggtitle("gasoline lag plot")
+
+```
+
+#### Correlogram
+The autocorrelation plot has ~r52 and ~r102 higher than the other lags, indicating an annual seasonal pattern in the data. There are troughs at ~r26 and ~r78 - this further confirms annual seasonality. 
+
+```{r}
+ggAcf(gasoline) + ggtitle("gasoline autocorrelation plot")
+```
+
+###
+
+
+
+# Notes
 
 ### What can be forecast?
 

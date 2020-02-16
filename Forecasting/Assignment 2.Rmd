@@ -1,0 +1,172 @@
+---
+title: "Data 624 Homework 2: Time Series"
+author: "Mary Anna Kivenson"
+date: "February 9, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Time Series {.tabset .tabset-fade}
+
+```{r message=FALSE, warning=FALSE}
+library(fpp2)
+library(zoo)
+library(plotly)
+require(gridExtra)
+```
+
+## Question 3.1
+
+For the following series, find an appropriate Box-Cox transformation in order to stabilise the variance. 
+`usnetelec`
+`usgdp`
+`mcopper`
+`enplanements`
+
+
+#### usnetelec
+
+```{r}
+data(usnetelec)
+invisible(lambda <- round(BoxCox.lambda(usnetelec),3))
+grid.arrange(autoplot(usnetelec) + ggtitle("usnetelec"),autoplot(BoxCox(usnetelec,lambda)) + ggtitle(paste("BoxCox Transform, lambda =", lambda)), ncol = 1)
+```
+
+
+#### usgdp
+
+```{r}
+data(usgdp)
+invisible(lambda <- round(BoxCox.lambda(usgdp),3))
+grid.arrange(autoplot(usgdp) + ggtitle("usgdp"),autoplot(BoxCox(usgdp,lambda)) + ggtitle(paste("BoxCox Transform, lambda =", lambda)), ncol = 1)
+```
+
+
+#### mcopper
+
+```{r}
+data(mcopper)
+invisible(lambda <- round(BoxCox.lambda(mcopper),3))
+grid.arrange(autoplot(mcopper) + ggtitle("mcopper"),autoplot(BoxCox(mcopper,lambda)) + ggtitle(paste("BoxCox Transform, lambda =", lambda)), ncol = 1)
+```
+
+
+#### enplanements
+```{r}
+data(enplanements)
+invisible(lambda <- round(BoxCox.lambda(enplanements),3))
+grid.arrange(autoplot(enplanements) + ggtitle("enplanements"),autoplot(BoxCox(enplanements,lambda)) + ggtitle(paste("BoxCox Transform, lambda =", lambda)), ncol = 1)
+```
+
+
+## Question 3.2
+
+Why is a Box-Cox transformation unhelpful for the `cangas` data?
+
+cangas is Monthly Canadian gas production, billions of cubic metres, January 1960 - February 2005
+
+```{r}
+data(cangas)
+invisible(lambda <- round(BoxCox.lambda(cangas),3))
+grid.arrange(autoplot(cangas) + ggtitle("cangas"),autoplot(BoxCox(cangas,lambda)) + ggtitle(paste("BoxCox Transform, lambda =", lambda)), ncol = 1)
+```
+
+The variability issue in this time series is still the same after the BoxCox transformation (low variability after 1995, high variability between 1980-1990). The other time series did not have evidence of cyclic patterns, but this time series does. The cyclic pattern in this time series causes changes in its variability. In addition, there are situations where variation is not extreme enough for a transformation to be needed.
+
+## Question 3.3
+
+What Box-Cox transformation would you select for your retail data (from Exercise 3 in Section 2.10)?
+
+I would use a Box-Cox transformation with lambda value of 0.214. This value successfully stabilizes the time series.
+
+```{r message=FALSE, warning=FALSE}
+temp = tempfile(fileext = ".xlsx")
+dataURL <- "https://otexts.com/fpp2/extrafiles/retail.xlsx"
+download.file(dataURL, destfile=temp, mode='wb')
+retaildata <- readxl::read_excel(temp, skip=1)
+myts <- ts(retaildata[,"A3349396W"], frequency=12, start=c(1982,4))
+invisible(lambda <- round(BoxCox.lambda(myts),3))
+grid.arrange(autoplot(myts) + ggtitle("myts"),autoplot(BoxCox(myts,lambda)) + ggtitle(paste("BoxCox Transform, lambda =", lambda)), ncol = 1)
+```
+
+## Question 3.8
+
+For your retail time series (from Exercise 3 in Section 2.10):
+
+
+a) Split the data into two parts using
+
+```{r}
+myts.train <- window(myts, end=c(2010,12))
+myts.test <- window(myts, start=2011)
+```
+
+
+b) Check that your data have been split appropriately by producing the following plot.
+
+```{r}
+autoplot(myts) +
+  autolayer(myts.train, series="Training") +
+  autolayer(myts.test, series="Test")
+```
+
+
+c) Calculate forecasts using snaive applied to myts.train.
+
+```{r}
+fc <- snaive(myts.train)
+```
+
+
+d) Compare the accuracy of your forecasts against the actual values stored in myts.test.
+
+All error measures for the test set are higher than error measures for the training set. Since the values in the test dataset are > 20,000, an RMSE of 983 is a decent result.
+
+```{r}
+accuracy(fc,myts.test)
+```
+
+e) Check the residuals.
+
+```{r}
+checkresiduals(fc)
+```
+
+Do the residuals appear to be uncorrelated and normally distributed?
+
+The residuals are not normally distributed (there is right skew), with more residual variability in the test set than the training set. The lag shows that residuals are not uncorrelated.
+
+f) How sensitive are the accuracy measures to the training/test split?
+
+We can test training/test set split sensitivity using cross validation.
+
+
+```{r}
+modelcv <- CVar(myts, k=5, lambda=0.15)
+autoplot(myts, series="Data") +
+  autolayer(modelcv$testfit, series="Fits") +
+  autolayer(modelcv$residuals, series="Residuals")
+ggAcf(modelcv$residuals)
+```
+
+What would happen if we changed the train and test size? Let's create a new test train split and test the error.
+
+The error did not change much when moving back the split by 6 months, but moving the split forward   increased the error for the test set.
+
+```{r}
+myts.train <- window(myts, end=c(2010,6))
+myts.test <- window(myts, start=c(2010,7))
+fc <- snaive(myts.train)
+accuracy(fc,myts.test)
+```
+
+
+```{r}
+myts.train <- window(myts, end=c(2011,6))
+myts.test <- window(myts, start=c(2011,7))
+fc <- snaive(myts.train)
+accuracy(fc,myts.test)
+```

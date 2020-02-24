@@ -1,0 +1,96 @@
+---
+title: "Data 624 Homework 3: Time Series"
+author: "Mary Anna Kivenson"
+date: "February 9, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Time Series Decomposition {.tabset .tabset-fade}
+
+```{r message=FALSE, warning=FALSE}
+library(fpp2)
+library(seasonal)
+library(zoo)
+library(plotly)
+```
+## Question 6.2
+
+The `plastics` data set consists of the monthly sales (in thousands) of product A for a plastics manufacturer for five years.
+
+a. Plot the time series of sales of product A. Can you identify seasonal fluctuations and/or a trend-cycle?
+
+There are seasonal fluctuations in this time series - peaks in the middle of the year and troughs in the beginning and end of each year. The series also shows an upwards trend.
+
+```{r}
+data(plastics)
+ggplotly(autoplot(plastics))
+```
+
+
+b. Use a classical multiplicative decomposition to calculate the trend-cycle and seasonal indices.
+
+
+
+```{r}
+plastics %>% decompose(type="multiplicative") -> fit
+trendcycle(fit)
+seasonal(fit)
+```
+
+
+
+c. Do the results support the graphical interpretation from part a?
+
+Yes - the trend cycle numbers are gradually increasing (with a mild decline towards the end of the time series). The seasonal indices are higher in the middle of the year and lower at the start and end of the year. This confirms the seasonality and trend cycle seen from the time plot.
+
+d. Compute and plot the seasonally adjusted data.
+
+```{r}
+ggplotly(autoplot(seasadj(fit)))
+```
+
+e. Change one observation to be an outlier (e.g., add 500 to one observation), and recompute the seasonally adjusted data. What is the effect of the outlier?
+
+The outlier results in a sharp spike in the month that it was inserted into.
+
+```{r}
+plastics_outlier <- plastics
+plastics_outlier[3] <- plastics[3] + 500
+plastics_outlier %>% decompose(type="multiplicative") -> fit
+ggplotly(autoplot(seasadj(fit)))
+```
+
+
+f. Does it make any difference if the outlier is near the end rather than in the middle of the time series?
+
+The outlier results in a sharp spike wherever it is inserted, whether near the end or the middle.
+
+```{r}
+plastics_outlier <- plastics
+plastics_outlier[58] <- plastics[58] + 500
+plastics_outlier %>% decompose(type="multiplicative") -> fit
+ggplotly(autoplot(seasadj(fit)))
+```
+
+## Question 6.3
+
+Recall your retail time series data (from Exercise 3 in Section 2.10). Decompose the series using X11. Does it reveal any outliers, or unusual features that you had not noticed previously?
+
+This reveals a sharp spike right after the year 2000 that I had not previously noticed. Because of the seasonality in the time series, I did not notice the jump in retail sales. 
+
+```{r warning=FALSE}
+temp = tempfile(fileext = ".xlsx")
+dataURL <- "https://otexts.com/fpp2/extrafiles/retail.xlsx"
+download.file(dataURL, destfile=temp, mode='wb')
+retaildata <- readxl::read_excel(temp, skip=1)
+myts <- ts(retaildata[,"A3349396W"], frequency=12, start=c(1982,4))
+
+myts %>% seas(x11="") -> fit
+autoplot(seasadj(fit)) +
+  ggtitle("X11 decomposition of A3349396W")
+```
+

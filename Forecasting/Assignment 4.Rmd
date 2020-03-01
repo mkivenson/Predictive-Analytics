@@ -12,7 +12,14 @@ knitr::opts_chunk$set(echo = TRUE)
 # Assignment 4 {.tabset .tabset-fade}
 
 ```{r message=FALSE, warning=FALSE}
-
+library(mlbench) 
+library(corrplot)
+library(ggplot2)
+require(gridExtra)
+library(car)
+library(caret)
+library(tidyverse)
+library(DT)
 ```
 ## Question 3.1
 
@@ -20,25 +27,245 @@ The UC Irvine Machine Learning Repository6 contains a data set related to glass 
 
 
 ```{r}
-library(mlbench) 
 data(Glass) 
 str(Glass)
 ```
 
 (a) Using visualizations, explore the predictor variables to understand their distributions as well as the relationships between predictors. 
-(b) Do there appear to be any outliers in the data? Are any predictors skewed? 
+
+```{r}
+summary(Glass)
+```
+
+
+### Distributions
+
+```{r}
+require(gridExtra)
+grid.arrange(ggplot(Glass, aes(RI)) + geom_histogram(binwidth = .001), #very narrow distribution, somewhat normal
+             ggplot(Glass, aes(Na)) + geom_histogram(binwidth = .5), #normal distribution
+             ggplot(Glass, aes(Mg)) + geom_histogram(binwidth = .25), #right skewed distribution
+             ggplot(Glass, aes(Al)) + geom_histogram(binwidth = .25), #normal distribution
+             ggplot(Glass, aes(Si)) + geom_histogram(binwidth = .5), #nomal distribution
+             ggplot(Glass, aes(K)) + geom_histogram(binwidth = .25), #right skewed distribution, seems to have an outlier
+             ggplot(Glass, aes(Ca)) + geom_histogram(binwidth = 1), #normal distribution
+             ggplot(Glass, aes(Ba)) + geom_histogram(binwidth = .25), #left-skewed distribution
+             ggplot(Glass, aes(Fe)) + geom_histogram(binwidth = .05), #left-skewed distribution
+             ncol=3)
+```
+
+
+### QQplot
+
+Taking a further look at the distributions of the feature variables, it looks like the distributions of Mg, Fe, Ba, and Ca are highly skewed. 
+
+```{r}
+colnames(subset(Glass, select = -c(Type)))
+```
+
+
+```{r}
+par(mfrow=c(3,3), cex=.8, mai=c(0,0,0.2,0))
+invisible(qqPlot(~ RI, data = Glass, main = "RI"))
+invisible(qqPlot(~ Na, data = Glass, main = "Na"))
+invisible(qqPlot(~ Mg, data = Glass, main = "Mg"))
+invisible(qqPlot(~ Al, data = Glass, main = "Al"))
+invisible(qqPlot(~ Si, data = Glass, main = "Si"))
+invisible(qqPlot(~ K, data = Glass, main = "K"))
+invisible(qqPlot(~ Ca, data = Glass, main = "Ca"))
+invisible(qqPlot(~ Ba, data = Glass, main = "Ba"))
+invisible(qqPlot(~ Fe, data = Glass, main = "Fe"))
+```
+
+
+### Boxplots
+
+In the histograms, a few outliers were spotted. Let's take a look at boxplots of the features to identify more outliers. 
+
+It looks like besides Mg, all fields have outliers. 
+
+```{r}
+grid.arrange(ggplot(Glass, aes(x="x", y = RI)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Na)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Mg)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Al)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Si)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = K)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Ca)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Ba)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ggplot(Glass, aes(x="x", y = Fe)) + geom_boxplot(outlier.colour="red", outlier.shape=16, outlier.size=1),
+             ncol=3)
+```
+
+
+### Correlation Plot
+
+From this correlation plot of glass dataset features, the following correlations can be identified:
+
+* Strong positive correlation between Ca and RI
+* Strong negative correlation between Si and RI
+* Moderate positive correlation between Ba and Mg
+* Moderate negative correlation between Ba and Al
+
+```{r}
+corrplot(cor(subset(Glass, select = -c(Type)), use = "complete.obs"), method="color", type="lower", tl.col = "black", tl.srt = 25)
+```
+
+
+### Scatter Plots
+
+Let's take a look at scatter plots of some of the highly correlated features. 
+
+From these scatter plots, it seems like the CA and RI / Si and RI correlations may cause issues in the model.
+
+```{r}
+grid.arrange(ggplot(Glass, aes(Ca, RI)) + geom_point(),
+             ggplot(Glass, aes(Si, RI)) + geom_point(), 
+             ggplot(Glass, aes(Mg, Ba)) + geom_point(), 
+             ggplot(Glass, aes(Al, Ba)) + geom_point(), 
+             ncol=2)
+```
+
+
+(b) Do there appear to be any outliers in the data? Are any predictors skewed?
+
+Based on the boxplots, it looks like all fields other than Mg have outliers. The histrograms and qqplots indicate that the distributions of Mg, Fe, Ba, and Ca are highly skewed. 
+
+
 (c) Are there any relevant transformations of one or more predictors that might improve the classiﬁcation model?
+
+
+#### To address skewness:
+
+A good way to address skewed features is boxcox, log, sqrt, or inverse transformations. However, none of these transformations seen to help significantly improve this model. Scaling may also help center a distribution, but it did not help in this case. Since some features have many values near 0, it may help to bin those predictors.
+
+* Apply a boxcox transform to Na, Ca, Si and Al.
+
+```{r}
+BoxCoxTrans(Glass$Na)
+BoxCoxTrans(Glass$Ca)
+BoxCoxTrans(Glass$Si)
+BoxCoxTrans(Glass$Al)
+```
+
+#### To address collinearity:
+
+RI has multicollinearlity with other features in the dataset. An approach to resolve this would be to remove this predictor, or apply PCA to the dataset.
+
+```{r}
+Glass = subset(Glass, select = -c(RI))
+pca <- prcomp(subset(Glass, select = -c(Type)), scale. = TRUE, center = TRUE)$x
+```
+
+
+#### To address outliers:
+
+We can apply a spatial sign transformation.
+
+```{r}
+library(caret)
+sst <- spatialSign(subset(Glass, select = -c(Type)))
+Type <- Glass$Type
+Glass <- as.data.frame(cbind(sst, Type))
+```
+
+
+
+#### Classification Model
+
+```{r}
+library(caTools) 
+  
+set.seed(123) 
+Type <- Glass$Type
+Glass <- as.data.frame(cbind(pca, Type))
+split = sample.split(Glass$Type, SplitRatio = 0.75) 
+  
+training_set = subset(Glass, split == TRUE) 
+test_set = subset(Glass, split == FALSE) 
+
+library("e1071")
+classifier = svm(formula = Type ~ ., 
+                 data = training_set, 
+                 type = 'C-classification', 
+                 kernel = 'linear')
+
+y_pred = predict(classifier, newdata = test_set[-9]) 
+cm = table(test_set[, 9], y_pred)
+prop.table(cm, margin = 2)
+
+#check how many accurate predictions there were
+summary(test_set[, 9] ==  y_pred)
+```
+
+
+
 
 ## Question 3.2
 
 The soybean data can also be found at the UC Irvine Machine Learning Repository. Data were collected to predict disease in 683 soybeans. The 35 predictors are mostly categorical and include information on the environmental conditions (e.g., temperature, precipitation) and plant conditions (e.g., left spots, mold growth). The outcome labels consist of 19 distinct classes.
 
 ```{r}
-library(mlbench) 
 data(Soybean) 
 ## See ?Soybean for details
 ```
 
 (a) Investigate the frequency distributions for the categorical predictors. Are any of the distributions degenerate in the ways discussed earlier in this chapter? 
+
+leaf.malf: fraction of unique values is low
+leaf.mild: fraction of unique values is low
+lodging: fraction of unique values is low
+mycelium: fraction of unique values is low
+sclerotia: fraction of unique values is low
+shriveling: fraction of unique values is low
+
+These predictors should probably be removed.
+
+
+```{r}
+summary(Soybean)
+```
+
 (b) Roughly 18% of the data are missing. Are there particular predictors that are more likely to be missing? Is the pattern of missing data related to the classes? 
+
+* sever, seed.tmt, germ, leaf.halo, leaf.marg, leaf.size, leaf.shread, leaf.malf, leaf.mild, fruiting.bodies, fruit.pods, fruit.spots, seed, mold.growth, seed.discolor, seed.size, shriveling have the most NA values
+* phytophthora-rot has the most missing values out of the classes
+* 2-4-d-injury and cyst-nematode also had many missing values
+* See table below for more detail
+
+```{r warning=FALSE}
+library(tidyr)
+library(reshape)
+res <- Soybean %>%
+  gather("predictor", "value", 2:36) %>%
+  group_by(Class, predictor) %>%
+  summarise(na.count=sum(is.na(value))) %>%
+  filter(na.count > 1)
+datatable(cast(res, predictor ~ Class))
+```
+
+
 (c) Develop a strategy for handling missing data, either by eliminating predictors or imputation.
+
+There are 19 classes, only the first 15 of which have been used in prior work. The folklore seems to be that the last four classes are unjustified by the data since they have so few examples. There are 35 categorical attributes, some nominal and some ordered. The value “dna” means does not apply. The values for attributes are encoded numerically, with the first value encoded as “0,” the second as “1,” and so forth.
+
+
+The following table shows the missing rate of each predictor.
+
+Since there seems to be overlap between rows that are missing data, try:
+
+* Dropping rows with multiple missing values
+* Dropping columns with the most missing values
+* Filling the rest with k nearest neighbors imputation
+
+The combination of the above that results in the highest accuracy should be used. The concern with dropping rows with multiple missing values is that certain classes will have too little data to classify. Instead, columns with many missing values and low classification importance should be dropped. Columns important in classification should have missing values imputed.
+
+```{r warning=FALSE}
+res <- Soybean %>%
+  gather("predictor", "value", 2:36) %>%
+  group_by(predictor) %>%
+  summarise(na.percent=sum(is.na(value))/n()) %>%
+  arrange(desc(na.percent))
+datatable(res)
+```
+

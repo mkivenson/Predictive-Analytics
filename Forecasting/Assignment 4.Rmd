@@ -107,6 +107,9 @@ From this correlation plot of glass dataset features, the following correlations
 * Moderate positive correlation between Ba and Mg
 * Moderate negative correlation between Ba and Al
 
+
+A VIF statistic can also indicate multicollinearity in the data.
+
 ```{r}
 corrplot(cor(subset(Glass, select = -c(Type)), use = "complete.obs"), method="color", type="lower", tl.col = "black", tl.srt = 25)
 ```
@@ -252,20 +255,37 @@ There are 19 classes, only the first 15 of which have been used in prior work. T
 
 The following table shows the missing rate of each predictor.
 
+```{r}
+res <- Soybean %>%
+  gather("predictor", "value", 2:36) %>%
+  group_by(predictor) %>%
+  summarise(na.percent=sum(is.na(value))/n()) %>%
+  arrange(desc(na.percent))
+res
+```
+
 Since there seems to be overlap between rows that are missing data, try:
 
 * Dropping rows with multiple missing values
 * Dropping columns with the most missing values
 * Filling the rest with k nearest neighbors imputation
 
-The combination of the above that results in the highest accuracy should be used. The concern with dropping rows with multiple missing values is that certain classes will have too little data to classify. Instead, columns with many missing values and low classification importance should be dropped. Columns important in classification should have missing values imputed.
+The concern with dropping rows with multiple missing values is that certain classes will have too little data to classify. Instead, I will drop columns that are degenerate and have many missing values, and impute the rest.
 
-```{r warning=FALSE}
+
+```{r}
 res <- Soybean %>%
   gather("predictor", "value", 2:36) %>%
   group_by(predictor) %>%
   summarise(na.percent=sum(is.na(value))/n()) %>%
   arrange(desc(na.percent))
-datatable(res)
+res
 ```
+
+```{r}
+library(DMwR)
+new_Soybean <- knnImputation(subset(Soybean, select = -c(leaf.malf, leaf.mild, lodging, mycelium, sclerotia, shriveling)))
+summary(new_Soybean)
+```
+
 

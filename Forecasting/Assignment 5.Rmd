@@ -213,12 +213,77 @@ grid.arrange(
 ## Question 7.8
 
 Recall your retail time series data (from Exercise 3 in Section 2.10).
-Why is multiplicative seasonality necessary for this series?
-Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.
-Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?
-Check that the residuals from the best method look like white noise.
-Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 8 in Section 3.7?
+
+```{r}
+temp = tempfile(fileext = ".xlsx")
+dataURL <- "https://otexts.com/fpp2/extrafiles/retail.xlsx"
+download.file(dataURL, destfile=temp, mode='wb')
+retaildata <- readxl::read_excel(temp, skip=1)
+myts <- ts(retaildata[,"A3349396W"], frequency=12, start=c(1982,4))
+```
+
+
+a) Why is multiplicative seasonality necessary for this series?
+
+Multiplicative seasonality is necessary for this series because the seasonality variability increases as time passes.
+
+b) Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.
+
+```{r}
+fit1 <- hw(myts, seasonal = "multiplicative")
+fit2 <- hw(myts, seasonal = "multiplicative", damped = TRUE)
+
+grid.arrange(
+  autoplot(myts) + autolayer(fit1, series="HW multiplicative forecasts", PI=FALSE) + labs(title = paste("multiplicative", ", RMSE =", round(RMSE(fit1$x, fit1$fitted),3))),
+  autoplot(myts) + autolayer(fit2, series="HW multiplicative damped forecasts", PI=FALSE) + labs(title = paste("multiplicative damped", ", RMSE =", round(RMSE(fit2$x, fit2$fitted),3)))
+)
+
+```
+
+
+c) Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?
+
+The multiplicative method has only a slightly lower RMSE than the damped multiplicative method. However, the damped method will ensure that the upwards trend does not result in over-forecasting.
+
+
+d) Check that the residuals from the best method look like white noise.
+
+There is autocorrelation in the residuals - they do not look like white noise. Both the models have autocorrelation, so neither are ideal.
+
+```{r}
+checkresiduals(fit2)
+```
+
+
+e) Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 8 in Section 3.7?
    
+The test set RMSE with the multiplicative damped model RMSE of 206.193 is much less than the seasonal naïve approach RMSE of 982.853.
+   
+```{r}
+myts.train <- window(myts, end = c(2010, 12))
+myts.test <- window(myts, start = 2011)
+
+fit <- hw(myts.train, h = 12, seasonal = "multiplicative", damped = TRUE)
+autoplot(fit) + labs(title = paste("multiplicative damped", ", RMSE =", round(RMSE(myts.test, fit$mean),3)))
+accuracy(fit,myts.test)
+```
+
+```{r}
+fc <- snaive(myts.train)
+accuracy(fc,myts.test)
+```
+
+
+
 ## Question 7.9
 
 For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?
+
+This model likely resulted in overtraining, since the new RMSE is lower for the training set, but much higher for the test set.
+
+```{r}
+fit3 <- forecast(stlf(myts.train, lambda = BoxCox.lambda(myts.train), h = 12), PI=TRUE)
+autoplot(fit3)
+accuracy(fit3, myts.test)
+```
+

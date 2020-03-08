@@ -1,0 +1,224 @@
+---
+title: "Data 624 Homework 5: Exponential Smoothing"
+author: "Mary Anna Kivenson"
+date: "March 7, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 5 {.tabset .tabset-fade}
+ 
+ 
+```{r message=FALSE, warning=FALSE}
+library(fpp2)
+library(mlbench) 
+library(corrplot)
+library(ggplot2)
+require(gridExtra)
+library(car)
+library(caret)
+library(tidyverse)
+library(DT)
+library(plotly)
+```
+ 
+## Question 7.1
+ 
+Consider the `pigs` series — the number of pigs slaughtered in Victoria each month.
+
+a) Use the ses() function in R to find the optimal values of α and ℓ0, and generate forecasts for the next four months.
+
+
+Optimal values:
+
+* alpha = 0.2971 
+
+* l = 77260.0561 
+
+```{r}
+summary(ses(pigs, 4))
+```
+
+```{r}
+autoplot(ses(pigs)) + autolayer(fitted(ses(pigs)), series = "Fitted")
+```
+
+
+
+b) Compute a 95% prediction interval for the first forecast using  
+$\hat{y} +- 1.96s$
+where s is the standard deviation of the residuals. Compare your interval with the interval produced by R.
+
+```{r}
+print(paste("R Lower bound:", ses(pigs, 4)$lower[1, "95%"]))
+print(paste("R Upper bound:", ses(pigs, 4)$upper[1, "95%"]))
+
+
+print(paste("Calculated Lower bound:", 98816.41  - (sd(ses(pigs, 4)$residuals) * 1.96)))
+print(paste("Calculated Upper bound:", 98816.41  + (sd(ses(pigs, 4)$residuals) * 1.96)))
+```
+
+This interval is slightly more narrow than the interval produced in R. 
+  
+## Question 7.5
+
+Data set books contains the daily sales of paperback and hardcover books at the same store. The task is to forecast the next four days’ sales for paperback and hardcover books.
+
+a) Plot the series and discuss the main features of the data.
+
+* Both paperback and hardcover book sales have an upwards trend
+* Paperback sales appear to cycle every 3-4 days
+* Hardcover sales appear to cycle every 10 days
+
+```{r}
+autoplot(books, facets=TRUE)
+```
+
+
+b) Use the ses() function to forecast each series, and plot the forecasts.
+
+```{r}
+books[,1]
+```
+
+
+```{r}
+paperback <- books[,1]
+hardcover <- books[,2]
+
+grid.arrange(
+autoplot(ses(paperback)) + autolayer(fitted(ses(paperback)), series = "Fitted Paperback"),
+autoplot(ses(hardcover)) + autolayer(fitted(ses(hardcover)), series = "Fitted Hardcover")
+)
+```
+
+
+c) Compute the RMSE values for the training data in each case.
+
+```{r}
+print(paste("Paperback RMSE:",
+    RMSE((ses(paperback))$x, (ses(paperback))$fitted)))
+print(paste("Hardcover RMSE:",
+    RMSE((ses(hardcover))$x, (ses(hardcover))$fitted)))
+```
+
+   
+## Question 7.6
+
+We will continue with the daily sales of paperback and hardcover books in data set books.
+
+a) Apply Holt’s linear method to the paperback and hardback series and compute four-day forecasts in each case.
+
+```{r}
+holt(paperback, 4)
+holt(hardcover, 4)
+```
+
+
+b) Compare the RMSE measures of Holt’s method for the two series to those of simple exponential smoothing in the previous question. (Remember that Holt’s method is using one more parameter than SES.) Discuss the merits of the two forecasting methods for these data sets.
+
+Holt's method has a lower RMSE for both paperback and hardcover book sales. This makes sense, since Holt's method is better for data with a trend (and both paperback and hardcover sales had an upwards trend).
+
+```{r}
+print(paste("Paperback RMSE:",
+    RMSE((ses(paperback))$x, holt(paperback, 4)$fitted)))
+print(paste("Hardcover RMSE:",
+    RMSE((ses(hardcover))$x, holt(hardcover, 4)$fitted)))
+```
+
+c) Compare the forecasts for the two series using both methods. Which do you think is best?
+
+Holt's method better captures the trend in the sales time series.
+
+```{r}
+grid.arrange(
+autoplot(ses(paperback)) + autolayer(fitted(ses(paperback)), series = "SES") + autolayer(fitted(holt(paperback)), series = "HOLT") + labs(title = "Paperback"),
+autoplot(ses(hardcover)) + autolayer(fitted(ses(hardcover)), series = "SES") + autolayer(fitted(holt(hardcover)), series = "HOLT") + labs(title = "Hardcover")
+)
+```
+
+d) Calculate a 95% prediction interval for the first forecast for each series, using the RMSE values and assuming normal errors. Compare your intervals with those produced using ses and holt.
+  
+The calculated intervals tend to be narrower than the confidence intervals produced using ses. Confidence intervals produced by holt are similar or wider than the calculated intervals. 
+  
+  
+```{r}
+
+ses_pb <- ses(paperback, 4)
+holt_pb <- holt(paperback, 4)
+ses_hc <- ses(hardcover, 4)
+holt_hc <- holt(hardcover, 4)
+
+
+dataset <- c("paperback", "paperback", "paperback", "paperback", "hardcover", "hardcover", "hardcover", "hardcover")
+model <- c("ses", "ses", "holt", "holt", "ses", "ses", "holt", "holt")
+calculation <- c("by model", "calculated", "by model", "calculated", "by model", "calculated", "by model", "calculated")
+lower <- c(ses_pb$lower[1, "95%"], 
+                     ses_pb$mean[1]  - (sd(ses_pb$residuals) * 1.96),
+                     holt_pb$lower[1, "95%"], 
+                     holt_pb$mean[1]  - (sd(ses_pb$residuals) * 1.96),
+                     ses_hc$lower[1, "95%"], 
+                     ses_hc$mean[1]  - (sd(ses_hc$residuals) * 1.96),
+                     holt_hc$lower[1, "95%"] ,
+                     holt_hc$mean[1]  - (sd(ses_hc$residuals) * 1.96)
+                     )
+upper <-  c(ses_pb$upper[1, "95%"], 
+                     ses_pb$mean[1]  + (sd(ses_pb$residuals) * 1.96),
+                     holt_pb$upper[1, "95%"], 
+                     holt_pb$mean[1]  + (sd(ses_pb$residuals) * 1.96),
+                     ses_hc$upper[1, "95%"], 
+                     ses_hc$mean[1]  + (sd(ses_hc$residuals) * 1.96),
+                     holt_hc$upper[1, "95%"], 
+                     holt_hc$mean[1]  + (sd(ses_hc$residuals) * 1.96)
+                     )
+
+
+intervals <- data.frame(cbind(dataset, model, calculation, lower, upper))
+datatable(intervals)
+```
+  
+
+  
+  
+## Question 7.7
+
+For this exercise use data set `eggs`, the price of a dozen eggs in the United States from 1900–1993. Experiment with the various options in the holt() function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each argument is doing to the forecasts.
+
+[Hint: use h=100 when calling holt() so you can clearly see the differences between the various options when plotting the forecasts.]
+
+Which model gives the best RMSE?
+
+The Box-Cox model gives the best RMSE, and it accounts for the downward trend in the time series.
+
+```{r}
+holt_orig <- holt(eggs, h = 100)
+holt_bc <- holt(eggs, lambda = BoxCox.lambda(eggs), h = 100)
+holt_damp <- holt(eggs, damped = TRUE, h = 100)
+holt_damp_bc <- holt(eggs, damped = TRUE, lambda = BoxCox.lambda(eggs), h = 100)
+
+
+grid.arrange(
+  autoplot(holt_orig) + labs(title = paste("Original", ", RMSE =", round(RMSE(holt_orig$x, holt_orig$fitted),3))),
+  autoplot(holt_bc) + labs(title = paste("Box-Cox", ", RMSE =", round(RMSE(holt_bc$x, holt_bc$fitted),3))),
+  autoplot(holt_damp) + labs(title = paste("Dampened", ", RMSE =", round(RMSE(holt_damp$x, holt_damp$fitted),3))),
+  autoplot(holt_damp_bc) + labs(title = paste("Dampened, Box-Cox", ", RMSE =", round(RMSE(holt_damp_bc$x, holt_damp_bc$fitted),3)))
+)
+
+```
+
+
+## Question 7.8
+
+Recall your retail time series data (from Exercise 3 in Section 2.10).
+Why is multiplicative seasonality necessary for this series?
+Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.
+Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?
+Check that the residuals from the best method look like white noise.
+Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 8 in Section 3.7?
+   
+## Question 7.9
+
+For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?

@@ -1,0 +1,154 @@
+---
+title: "Data 624 Homework 6: ARIMA"
+author: "Mary Anna Kivenson"
+date: "March 15, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 6 {.tabset .tabset-fade}
+ 
+ 
+```{r message=FALSE, warning=FALSE}
+library(fpp2)
+library(mlbench) 
+library(corrplot)
+library(ggplot2)
+require(gridExtra)
+library(car)
+library(caret)
+library(tidyverse)
+library(DT)
+library(plotly)
+```
+ 
+## Question 8.1
+
+Figure 8.31 shows the ACFs for 36 random numbers, 360 random numbers and 1,000 random numbers.
+
+!(https://otexts.com/fpp2/fpp_files/figure-html/wnacfplus-1.png)
+
+a ) Explain the differences among these figures. Do they all indicate that the data are white noise?
+
+The difference between the figures is caused by the length of the time series, which directly affects the acceptable autocorrelation range. Since all of the autocorrelations in the provided range of lags are within the margins, this indicates that the data are white noise.
+
+b) Why are the critical values at different distances from the mean of zero? Why are the autocorrelations different in each figure when they each refer to white noise?
+
+The critical values are at different distances from the mean of 0 because of distance depends on the size of the time series. Since the length of each series are significantly different, there will be different acceptable ranges for white noise, defined by the following equation:
+
+$\pm 2 / \sqrt{T}$ 
+
+where t is the length of the time series
+
+
+## Question 8.2
+
+A classic example of a non-stationary series is the daily closing IBM stock price series (data set `ibmclose`). Use R to plot the daily closing prices for IBM stock and the ACF and PACF. Explain how each plot shows that the series is non-stationary and should be differenced.
+
+A stationary time series will look the same at any time interval; while it can have cyclic behavior, there should not be seasonality or a trend.
+
+The following time series plot shows: 
+* A sharp drop in daily closing IBM stock price, indicating a downwards trend
+* Higher variability between time 200 and time 300 (can be addressed with boxcox transformation)
+
+
+```{r}
+autoplot(ibmclose)
+```
+
+
+The ACF and PACF help determine how the series should be differenced. 
+* The ACF plot shows strong autocorrelation at all lags
+* The PACF plot only shows a strong autocorrelation at lag 1, because it removes the effects of correlation between lags.
+
+```{r}
+ggtsdisplay(ibmclose %>% BoxCox(2))
+```
+
+
+
+This suggests that it might only be neccessary to difference once, using the previous lag. We see that this addresses most of the autocorrelation, since:
+
+* Most of the autocorrelations fall within the interval
+* The portmanteau test produces a high p-value
+
+
+```{r}
+ggtsdisplay(ibmclose %>% diff(1))
+Box.test(ibmclose %>% diff(1),lag=10, fitdf=0, type="Lj")
+```
+
+
+
+
+## Question 8.3
+
+For the following series, find an appropriate Box-Cox transformation and order of differencing in order to obtain stationary data.
+
+a) `usnetelec`
+
+b) `usgdp`
+
+c) `mcopper`
+
+d) `enplanements`
+
+e) `visitors`
+
+## Question 8.5
+
+For your retail data (from Exercise 3 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.
+
+## Question 8.6
+
+Use R to simulate and plot some data from simple ARIMA models.
+a) Use the following R code to generate data from an AR(1) model with ϕ1 = 0.6 and σ^2=1. The process starts with y1=0.
+  
+```{r}
+y <- ts(numeric(100))
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- 0.6*y[i-1] + e[i]
+```
+
+b) Produce a time plot for the series. How does the plot change as you change ϕ1?
+
+
+c) Write your own code to generate data from an MA(1) model with θ1=0.6 and σ2=1.
+
+
+d) Produce a time plot for the series. How does the plot change as you change θ1?
+
+
+e) Generate data from an ARMA(1,1) model with ϕ1=0.6, θ1=0.6 and σ2=1.
+
+
+f) Generate data from an AR(2) model with  ϕ1=−0.8,  ϕ2=0.3 and  σ2=1. (Note that these parameters will give a non-stationary series.)
+
+
+g) Graph the latter two series and compare them.
+
+## Question 8.7
+
+a) Consider `wmurders`, the number of women murdered each year (per 100,000 standard population) in the United States. By studying appropriate graphs of the series in R, find an appropriate ARIMA(p, d, q) model for these data.
+
+
+b) Should you include a constant in the model? Explain.
+
+
+c) Write this model in terms of the backshift operator.
+
+
+d) Fit the model using R and examine the residuals. Is the model satisfactory?
+
+
+e) Forecast three times ahead. Check your forecasts by hand to make sure that you know how they have been calculated.
+
+
+f) Create a plot of the series with forecasts and prediction intervals for the next three periods shown.
+
+
+g) Does auto.arima() give the same model you have chosen? If not, which model do you think is better?

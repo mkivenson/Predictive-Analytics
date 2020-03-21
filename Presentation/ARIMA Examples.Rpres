@@ -4,25 +4,169 @@ author:
 date: 
 autosize: true
 
-First Slide
-========================================================
-
-For more details on authoring R presentations please visit <https://support.rstudio.com/hc/en-us/articles/200486468>.
-
-- Bullet 1
-- Bullet 2
-- Bullet 3
-
-Slide With Code
-========================================================
-
-```{r}
-summary(cars)
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(fpp2)
+library(lubridate)
+library(zoo)
+library(tidyverse)
 ```
 
-Slide With Plot
+
+Non-Seasonal ARIMA: Dataset
 ========================================================
 
-```{r, echo=FALSE}
-plot(cars)
+This dataset is collected from a monitor system mounted in a house. It corresponds to approximately 40 days of monitoring data. 
+
+- Attribute: Monitored wind speed
+- Time period: 40 days
+- Source: UCI Machine Learning Respository
+- Modifications: Mean wind speed grouped by hour
+
+
+Non-Seasonal ARIMA: Plot
+========================================================
+
+```{r include=FALSE}
+wind <- read.csv("https://raw.githubusercontent.com/mkivenson/Predictive-Analytics/master/Presentation/Datasets/wind.csv")
+wind$hour = hour(hms(as.character(wind$Time)))
+wind <- wind %>% group_by(Date, hour) %>% summarise(wind = mean(wind))
+wind <- ts(wind$wind, frequency = 365, start = c(2012, 75))
+```
+
+
+Looking at the time series plot, the following can be observed:
+
+- There does not appear to be any seasonality or trends in the dataset
+- The data are not stationary, there are sharp peaks and dips
+- The variance appears to be constant throughout the time series
+
+
+```{r echo=FALSE, fig.height=4, fig.width=10}
+autoplot(wind) + 
+  ggtitle("Monitored Wind Speed (m/s)") +
+  xlab("Time, 60 Minute Intervals") +
+  ylab("wind speed in (m/s)")
+```
+
+
+
+Non-Seasonal ARIMA Example: Auto Arima
+========================================================
+
+Let's try applying auto arima to the wind speed time series and taking a look at residuals.
+
+* The ACF plot shows residuals outside normal threshold limits
+* The portmanteau test returns a very low p-value
+
+Both of these indictors show these is still autocorrelation present in the time series.
+
+```{r}
+fit <- auto.arima(wind, seasonal = FALSE)
+checkresiduals(fit)
+```
+
+Non-Seasonal ARIMA Example: ACF and PACF
+========================================================
+
+The ACF and PACF lag plots show the following:
+
+- Autocorrelation throughout the ACF plot (adjust autoregressive part)
+- Autocorrelation at lag = 1 and lag = 2 in the PACF plot
+
+
+```{r}
+ggtsdisplay(wind)
+```
+
+
+Non-Seasonal ARIMA Example: Manual Arima
+========================================================
+
+The previous model was not sufficient because there was autocorrelation. To resolve this, the order of the autoregressive part has been increased to 5.
+
+```{r}
+fit <- Arima(wind, order = c(5, 0, 5))
+checkresiduals(fit)
+```
+
+
+Non-Seasonal ARIMA Example: Forecast
+========================================================
+
+Let's forecast average hourly wind speed for the next two days:
+
+```{r}
+autoplot(wind) + autolayer(forecast(fit, h = 48))
+```
+
+
+
+Seasonal ARIMA Example: Dataset
+========================================================
+
+This dataset contains measurements of electric power consumption in one household with a one-minute sampling rate over a period of almost 4 years. 
+
+- Attribute: Global_active_power
+- Time period: 4 years (data every minute)
+- Source: UCI Machine Learning Respository
+- Modifications: Mean Global_active_power grouped by week
+
+
+
+
+```{r include=FALSE}
+file_loc = 'https://raw.githubusercontent.com/mkivenson/Predictive-Analytics/master/Presentation/Datasets/consumption.csv'
+con <- file(file_loc, open = "r")
+consumption <- read.table(con, header = T, sep = ',', stringsAsFactors = FALSE)
+consumption <- ts(consumption$Global_active_power, frequency = 52, start = c(2006, 50))
+```
+
+Seasonal ARIMA Example: Plot
+========================================================
+
+
+The following plot shows:
+* Original consumption time series
+* Season adjusted time series
+* BoxCox transformation time series
+* BoxCox transformation then season adjusted time series
+
+
+```{r}
+adj_consumption <- consumption %>% stl(s.window = "periodic") %>% seasadj()
+bc_consumption <- BoxCox(consumption, BoxCox.lambda(adj_consumption))
+bc_adj_consumption <- bc_consumption %>% stl(s.window = "periodic") %>% seasadj()
+autoplot(consumption) + autolayer(adj_consumption) + autolayer(bc_consumption) + autolayer(bc_adj_consumption)
+```
+
+
+
+
+
+
+
+Seasonal ARIMA Example: Auto Arima
+========================================================
+
+Let's try applying auto arima to the consumption time series and taking a look at residuals.
+
+* The ACF plot shows residuals inside normal threshold limits
+* The portmanteau test returns a very high p-value
+
+Both of these indictors show that there is no autocorrelation present in the time series.
+
+
+```{r}
+fit <- auto.arima(bc_adj_consumption, seasonal = TRUE)
+checkresiduals(fit)
+```
+
+Seasonal ARIMA Example: Forecast
+========================================================
+
+Let's forecast average weekly consumption for the next 52 weeks:
+
+
+```{r}
+autoplot(bc_adj_consumption) + autolayer(forecast(fit, h = 52))
 ```

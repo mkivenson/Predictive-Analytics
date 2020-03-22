@@ -29,7 +29,7 @@ library(urca)
 
 Figure 8.31 shows the ACFs for 36 random numbers, 360 random numbers and 1,000 random numbers.
 
-!(https://otexts.com/fpp2/fpp_files/figure-html/wnacfplus-1.png)
+![](https://otexts.com/fpp2/fpp_files/figure-html/wnacfplus-1.png)
 
 a ) Explain the differences among these figures. Do they all indicate that the data are white noise?
 
@@ -276,6 +276,7 @@ myts %>% BoxCox(BoxCox.lambda(myts)) %>% diff(12) %>% diff(1) %>% ur.kpss() %>% 
 ## Question 8.6
 
 Use R to simulate and plot some data from simple ARIMA models.
+
 a) Use the following R code to generate data from an AR(1) model with ϕ1 = 0.6 and σ^2=1. The process starts with y1=0.
   
 ```{r}

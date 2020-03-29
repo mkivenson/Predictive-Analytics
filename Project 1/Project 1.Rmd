@@ -1,0 +1,280 @@
+---
+title: "Forecasting Project"
+author: "Mary Anna Kivenson"
+date: "March 21, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(httr)
+library(fpp2)
+library(imputeTS)
+library(tidyverse)
+library(urca)
+```
+
+# Part A
+
+I want you to forecast how much cash is taken out of 4 different ATM machines for May 2010.  The data is given in a single file.  The variable ‘Cash’ is provided in hundreds of dollars, other than that it is straight forward. I am being somewhat ambiguous on purpose to make this have a little more business feeling.  Explain and demonstrate your process, techniques used and not used, and your actual forecast.  I am giving you data via an excel file, please provide your written report on your findings, visuals, discussion and your R code via an RPubs link along with the actual.rmd file  Also please submit the forecast which you will put in an Excel readable file.
+
+## Data Exploration
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+url = "https://github.com/mkivenson/Predictive-Analytics/blob/master/Project%201/ATM624Data.xlsx?raw=true"
+GET(url, write_disk(tf <- tempfile(fileext = ".xlsx")))
+df <- readxl::read_xlsx(tf, col_types = c("date", "guess", "numeric"))
+df <- df %>% spread(ATM, Cash)  %>% select(DATE:ATM4)
+```
+
+### Summary
+
+Let's begin by taking a look at a summary of each of the ATM withdrawal time series. One important item to note is that each of the time series has missing values. There is also a very high withdrawal in the ATM4 time series that should be addressed.
+
+```{r}
+summary(df)
+```
+
+
+### Visualization
+
+By taking a look at the time series plots for each ATM (assuming weekly seasonality), the following observations can be made:
+
+- ATM 1 and ATM 2 have stable variability and frequent peaks and troughs
+- ATM 3 has no activity until May
+- ATM 4 has an outlier that should be removed
+
+```{r}
+atm_ts <- ts(df %>% select(ATM1:ATM4), frequency=7)
+autoplot(atm_ts, facet = TRUE)
+```
+
+
+### Missing Data
+
+Taking  a look at the time series, there is no data avilable from 5/1/2010 - 5/14/2010 for any of the ATMs - this time period will be removed from our dataset. There are also a few missing values in the ATM 1 and ATM 2 time series in June 2009. These missing values will be replaced using the `tsclean()` function. The `tsclean` function will also replaces any outliers in the data, so it will address the outlier in the ATM4 dataset (along with any other outliers).
+
+```{r}
+df[rowSums(is.na(df)) > 0,]
+```
+
+
+#### Test train split
+
+Before appying the `tsclean` function, each time series will be split into train and test datasets. The `tsclean` function will only be used on the train datasets. A train - test ratio of 66% will be used.
+
+
+```{r}
+atm1_train <- subset(atm_ts[,1], end = length(atm_ts[,1])- 80)
+atm1_test <- subset(atm_ts[,1], start = length(atm_ts[,1]) - 79, end = length(atm_ts[,1]) - 14)
+
+atm2_train <- subset(atm_ts[,2], end = length(atm_ts[,2])- 80)
+atm2_test <- subset(atm_ts[,2], start = length(atm_ts[,2]) - 79, end = length(atm_ts[,2]) - 14)
+
+atm3_train <- subset(atm_ts[,3], end = length(atm_ts[,3])- 80)
+atm3_test <- subset(atm_ts[,3], start = length(atm_ts[,3]) - 79, end = length(atm_ts[,3]) - 14)
+
+atm4_train <- subset(atm_ts[,4], end = length(atm_ts[,4])- 80)
+atm4_test <- subset(atm_ts[,4], start = length(atm_ts[,4]) - 79, end = length(atm_ts[,4] - 14))
+```
+
+
+
+```{r}
+atm1_train <- tsclean(atm1_train)
+atm2_train <- tsclean(atm2_train)
+atm4_train <- tsclean(atm4_train)
+```
+
+
+
+### Models
+
+Now that the outliers and missing values in the dataset have been addressed, we will split the data into train-test sets and apply the following models:
+
+- Seasonally Adjusted Decomposition
+- Holt-Winters Seasonal Exponential Smoothing
+- Seasonal ARIMA
+
+
+
+#### Decomposition
+
+```{r}
+fit <- stlf(atm1_train, h = 66)
+atm1_forecast_decomp <- forecast(fit, method="naive", h = 66) 
+autoplot(atm1_train) +
+autolayer(atm1_forecast_decomp, PI = FALSE, series = 'Predicted') + 
+  autolayer(atm1_test, series = 'Actual')
+```
+
+
+```{r}
+fit <- stlf(atm2_train, robust=TRUE, h = 66) 
+atm2_forecast_decomp <- forecast(fit, method="naive", h = 66) 
+autoplot(atm2_train) +
+autolayer(atm2_forecast_decomp, PI = FALSE, series = 'Predicted') + 
+  autolayer(atm2_test, series = 'Actual')
+```
+
+
+
+
+```{r}
+fit <- stlf(atm4_train, robust=TRUE, h = 66) 
+atm4_forecast_decomp <- forecast(fit, method="naive", h = 66) 
+autoplot(atm4_train) +
+autolayer(atm4_forecast_decomp, PI = FALSE, series = 'Predicted') + 
+  autolayer(atm4_test, series = 'Actual')
+```
+
+
+
+
+#### Exponential Smoothing
+
+
+
+```{r}
+atm1_forecast_es <- hw(atm1_train, damped = TRUE, seasonal="multiplicative", h=66)
+autoplot(atm1_train) +
+  autolayer(atm1_forecast_es, series="HW multiplicative damped", PI=FALSE) +
+  autolayer(atm1_test, series="test")
+```
+
+
+
+
+```{r}
+atm2_forecast_es <- hw(atm2_train, damped = TRUE, seasonal="multiplicative", h=66)
+autoplot(atm2_train) +
+  autolayer(atm2_forecast_es, series="HW multiplicative damped", PI=FALSE) +
+  autolayer(atm2_test, series="test")
+```
+
+
+
+```{r}
+atm4_forecast_es <- hw(atm4_train, damped = TRUE, seasonal="multiplicative", h=66)
+autoplot(atm4_train) +
+  autolayer(atm4_forecast_es, series="HW multiplicative damped", PI=FALSE) +
+  autolayer(atm4_test, series="test")
+```
+
+
+
+
+#### ARIMA
+
+```{r}
+atm1_train %>% diff() %>% ur.kpss() %>% summary()
+```
+
+
+
+
+```{r}
+fit <- Arima(atm1_train, order=c(1,1,2), seasonal=c(0,1,1))
+atm1_forecast_arima <- forecast(fit, h = 66)
+checkresiduals(fit)
+```
+
+
+
+```{r}
+fit <- auto.arima(atm1_train, seasonal = TRUE)
+atm1_forecast_arima <- forecast(fit, h = 66)
+checkresiduals(fit)
+```
+`
+
+
+```{r}
+fit <- auto.arima(atm2_train, seasonal = TRUE)
+atm2_forecast_arima <- forecast(fit, h = 66)
+checkresiduals(fit)
+```
+
+```{r}
+fit <- auto.arima(atm4_train, seasonal = TRUE)
+atm4_forecast_arima <- forecast(fit, h = 66)
+checkresiduals(fit)
+```
+
+
+## Model Selection
+
+```{r}
+accuracy(atm1_forecast_decomp, atm1_test)
+accuracy(atm1_forecast_es, atm1_test)
+accuracy(atm1_forecast_arima, atm1_test)
+```
+
+
+```{r}
+accuracy(atm2_forecast_decomp, atm2_test)
+accuracy(atm2_forecast_es, atm2_test)
+accuracy(atm2_forecast_arima, atm2_test)
+```
+
+
+```{r}
+accuracy(atm4_forecast_decomp, atm4_test)
+accuracy(atm4_forecast_es, atm4_test)
+accuracy(atm4_forecast_arima, atm4_test)
+```
+
+## Model Evaluation
+
+
+
+# Part B
+
+Part B consists of a simple dataset of residential power usage for January 1998 until December 2013.  Your assignment is to model these data and a monthly forecast for 2014.  The data is given in a single file.  The variable ‘KWH’ is power consumption in Kilowatt hours, the rest is straight forward. Add this to your existing files above. 
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+url = "https://github.com/mkivenson/Predictive-Analytics/blob/master/Project%201/ResidentialCustomerForecastLoad-624.xlsx?raw=true"
+GET(url, write_disk(tf <- tempfile(fileext = ".xlsx")))
+df <- readxl::read_xlsx(tf)
+```
+
+## Data Exploration
+
+```{r}
+kwh <- ts(df$KWH, frequency = 12, start = c(1998, 1))
+kwh %>% tsclean() %>% autoplot()
+```
+
+
+```{r}
+kwh %>% tsclean() %>% ggseasonplot(polar = TRUE)
+```
+
+
+## Model Selection
+
+
+```{r}
+fit <- auto.arima(kwh %>% tsclean(), seasonal = TRUE)
+kwh_FIT <- forecast(fit, h = 66)
+checkresiduals(kwh_FIT)
+```
+
+```{r}
+autoplot(kwh_FIT)
+```
+
+
+## Model Evaluation
+
+# Part C
+
+Part C consists of two data sets.  These are simple 2 columns sets, however they have different time stamps.  Your optional assignment is to time-base sequence the data and aggregate based on hour (example of what this looks like, follows).  Note for multiple recordings within an hour, take the mean.  Then to determine if the data is stationary and can it be forecast.  If so, provide a week forward forecast and present results via Rpubs and .rmd and the forecast in an Excel readable file.   
+
+## Data Exploration
+
+## Model Selection
+
+## Model Evaluation

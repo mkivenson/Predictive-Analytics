@@ -13,6 +13,8 @@ library(fpp2)
 library(imputeTS)
 library(tidyverse)
 library(urca)
+library(DT)
+library(lubridate)
 ```
 
 # Part A
@@ -42,41 +44,41 @@ summary(df)
 By taking a look at the time series plots for each ATM (assuming weekly seasonality), the following observations can be made:
 
 - ATM 1 and ATM 2 have stable variability and frequent peaks and troughs
-- ATM 3 has no activity until May
-- ATM 4 has an outlier that should be removed
+- ATM 3 has no activity until the last three days in the time series
+- ATM 4 has an outlier (an 11 million dollar withdrawal) that should be removed
+
+
 
 ```{r}
-atm_ts <- ts(df %>% select(ATM1:ATM4), frequency=7)
+df <- df[1:(dim(df)[1] - 14),]
+atm_ts <- ts(df %>% select(ATM1:ATM4), frequency=7, end = nrow(df) - 14)
 autoplot(atm_ts, facet = TRUE)
 ```
 
 
 ### Missing Data
 
-Taking  a look at the time series, there is no data avilable from 5/1/2010 - 5/14/2010 for any of the ATMs - this time period will be removed from our dataset. There are also a few missing values in the ATM 1 and ATM 2 time series in June 2009. These missing values will be replaced using the `tsclean()` function. The `tsclean` function will also replaces any outliers in the data, so it will address the outlier in the ATM4 dataset (along with any other outliers).
+Taking a look at the time series, there is no data avilable from 5/1/2010 - 5/14/2010 for any of the ATMs - this time period was removed from our dataset. There are also a few missing values in the ATM 1 and ATM 2 time series in June 2009. These missing values will be replaced using the `tsclean()` function. The `tsclean()` function will also replaces any outliers in the data, so it will address the outlier in the ATM4 dataset (along with any other outliers).
 
 ```{r}
-df[rowSums(is.na(df)) > 0,]
+datatable(df[rowSums(is.na(df)) > 0,])
 ```
 
 
-#### Test train split
+### Test Train Split
 
-Before appying the `tsclean` function, each time series will be split into train and test datasets. The `tsclean` function will only be used on the train datasets. A train - test ratio of 66% will be used.
+Before appying the `tsclean()` function, each time series will be split into train and test datasets. The `tsclean` function will only be used on the train datasets. A train - test ratio of 66% will be used. Note that ATM3 data was not split into test and train sets. With only three non-missing datapoints, this is not enough data to be able to apply advanced forecasting methods. Instead, a naive or average approach will be used for ATM3.
 
 
 ```{r}
 atm1_train <- subset(atm_ts[,1], end = length(atm_ts[,1])- 80)
-atm1_test <- subset(atm_ts[,1], start = length(atm_ts[,1]) - 79, end = length(atm_ts[,1]) - 14)
+atm1_test <- subset(atm_ts[,1], start = length(atm_ts[,1]) - 79)
 
 atm2_train <- subset(atm_ts[,2], end = length(atm_ts[,2])- 80)
-atm2_test <- subset(atm_ts[,2], start = length(atm_ts[,2]) - 79, end = length(atm_ts[,2]) - 14)
-
-atm3_train <- subset(atm_ts[,3], end = length(atm_ts[,3])- 80)
-atm3_test <- subset(atm_ts[,3], start = length(atm_ts[,3]) - 79, end = length(atm_ts[,3]) - 14)
+atm2_test <- subset(atm_ts[,2], start = length(atm_ts[,2]) - 79)
 
 atm4_train <- subset(atm_ts[,4], end = length(atm_ts[,4])- 80)
-atm4_test <- subset(atm_ts[,4], start = length(atm_ts[,4]) - 79, end = length(atm_ts[,4] - 14))
+atm4_test <- subset(atm_ts[,4], start = length(atm_ts[,4]) - 79)
 ```
 
 
@@ -91,7 +93,7 @@ atm4_train <- tsclean(atm4_train)
 
 ### Models
 
-Now that the outliers and missing values in the dataset have been addressed, we will split the data into train-test sets and apply the following models:
+Now that the outliers and missing values in the dataset have been addressed and data have been split into train-test sets, the following models will be tested:
 
 - Seasonally Adjusted Decomposition
 - Holt-Winters Seasonal Exponential Smoothing
@@ -99,34 +101,43 @@ Now that the outliers and missing values in the dataset have been addressed, we 
 
 
 
-#### Decomposition
+#### Seasonally Adjusted Decomposition
 
-```{r}
+Although decomposition is more frequently used to gain a deeper understanding of a time series, it can also be used for forecasting. The following graphs show the outcome of seasonally adjusted decomposition forecasting on ATM1, ATM2, and ATM4. A comparison of the actual vs predicted values is provided. In each model, BoxCox transformation and bias adjustments are performed.
+
+From the appearance of the plot below, it appears that the actual values have greater variability and spread than the predicted values. 
+
+```{r fig.width= 10}
 fit <- stlf(atm1_train, h = 66)
-atm1_forecast_decomp <- forecast(fit, method="naive", h = 66) 
+atm1_forecast_decomp <- forecast(fit, method="naive", h = 66, robust = TRUE, lambda="auto", biasadj = TRUE)  
 autoplot(atm1_train) +
 autolayer(atm1_forecast_decomp, PI = FALSE, series = 'Predicted') + 
-  autolayer(atm1_test, series = 'Actual')
+  autolayer(atm1_test, series = 'Actual') + 
+  ggtitle("ATM 1 - Seasonally Adjusted Decomposition")
 ```
 
 
-```{r}
-fit <- stlf(atm2_train, robust=TRUE, h = 66) 
+For ATM2, the seasonally adjusted decomposition model seems to overestimate the predicted ATM withdrawals.
+
+```{r fig.width= 10}
+fit <- stlf(atm2_train, robust=TRUE, damped = TRUE, h = 66, lambda="auto", biasadj = TRUE) 
 atm2_forecast_decomp <- forecast(fit, method="naive", h = 66) 
 autoplot(atm2_train) +
 autolayer(atm2_forecast_decomp, PI = FALSE, series = 'Predicted') + 
-  autolayer(atm2_test, series = 'Actual')
+  autolayer(atm2_test, series = 'Actual') + 
+  ggtitle("ATM 2 - Seasonally Adjusted Decomposition")
 ```
 
 
+The ATM 4 forecast has a similar problem to the ATM 1 prediction - the forecast has a much smaller range of withdrawals.
 
-
-```{r}
+```{r fig.width= 10}
 fit <- stlf(atm4_train, robust=TRUE, h = 66) 
-atm4_forecast_decomp <- forecast(fit, method="naive", h = 66) 
+atm4_forecast_decomp <- forecast(fit, method="naive", h = 66, lambda="auto", biasadj = TRUE)  
 autoplot(atm4_train) +
 autolayer(atm4_forecast_decomp, PI = FALSE, series = 'Predicted') + 
-  autolayer(atm4_test, series = 'Actual')
+  autolayer(atm4_test, series = 'Actual') + 
+  ggtitle("ATM 4 - Seasonally Adjusted Decomposition")
 ```
 
 
@@ -134,32 +145,38 @@ autolayer(atm4_forecast_decomp, PI = FALSE, series = 'Predicted') +
 
 #### Exponential Smoothing
 
+Exponential smoothing may provide a better model for ATM withdrawals, especially for ATM 2. This is because exponential smoothing weights newer observations more heavily, so any recent changes will be reflected in the model forecast more. Since ATM data is a daily seasonal time series, a Holt-Winters seasonal multiplicative damped method will be used. 
 
 
-```{r}
+Applying an exponential smoothing method to the ATM1 time series seems to capture the seasonality of the time series, although the actual values have greater variability.
+
+```{r fig.width= 10}
 atm1_forecast_es <- hw(atm1_train, damped = TRUE, seasonal="multiplicative", h=66)
 autoplot(atm1_train) +
-  autolayer(atm1_forecast_es, series="HW multiplicative damped", PI=FALSE) +
-  autolayer(atm1_test, series="test")
+  autolayer(atm1_forecast_es, series="HW Predition", PI=FALSE) +
+  autolayer(atm1_test, series="Actual") + 
+  ggtitle("ATM 1 - HW Multiplicative")
 ```
 
 
+Exponential smoothing appears to be a much more accurate model for ATM 2 withdrawals than decomposition. The pattern and variability of the actual values are captured by the predicted values.
 
-
-```{r}
+```{r fig.width= 10}
 atm2_forecast_es <- hw(atm2_train, damped = TRUE, seasonal="multiplicative", h=66)
 autoplot(atm2_train) +
-  autolayer(atm2_forecast_es, series="HW multiplicative damped", PI=FALSE) +
-  autolayer(atm2_test, series="test")
+  autolayer(atm2_forecast_es, series="HW Prediction", PI=FALSE) +
+  autolayer(atm2_test, series="Actual") + 
+  ggtitle("ATM 2 - HW Multiplicative")
 ```
 
+The exponential smoothing model for ATM 4 has the same problem as the seasonally adjusted decomposition model - the prediction is more seasonal and less variable than the actual values.
 
-
-```{r}
+```{r fig.width= 10}
 atm4_forecast_es <- hw(atm4_train, damped = TRUE, seasonal="multiplicative", h=66)
 autoplot(atm4_train) +
   autolayer(atm4_forecast_es, series="HW multiplicative damped", PI=FALSE) +
-  autolayer(atm4_test, series="test")
+  autolayer(atm4_test, series="test") + 
+  ggtitle("ATM 4 - HW Multiplicative")
 ```
 
 
@@ -167,8 +184,24 @@ autoplot(atm4_train) +
 
 #### ARIMA
 
+ARIMA models are ideal for time series with autocorrelation - we see from the ACF plot below, that ATM1 withdrawals have high autocorrelation at lag intervals of 7.
+
 ```{r}
-atm1_train %>% diff() %>% ur.kpss() %>% summary()
+ggAcf(atm1_train)
+```
+
+
+The first step to applying an ARIMA model to a time series is to ensure stationarity. This can be done with a KPSS Unit Root Test.
+
+```{r}  
+# ATM 1 is made stationary by differencing at lag = 7
+atm1_train %>% diff(1) %>% ur.kpss() %>% summary()
+
+# ATM 2 is made stationary by differencing at lag = 7
+atm2_train %>% diff(1) %>% ur.kpss() %>% summary()
+
+# ATM 4 is already stationary
+atm4_train %>% ur.kpss() %>% summary()
 ```
 
 
@@ -178,32 +211,45 @@ atm1_train %>% diff() %>% ur.kpss() %>% summary()
 fit <- Arima(atm1_train, order=c(1,1,2), seasonal=c(0,1,1))
 atm1_forecast_arima <- forecast(fit, h = 66)
 checkresiduals(fit)
+autoplot(atm1_train) +
+  autolayer(atm1_forecast_arima, series="ARIMA Prediction", PI=FALSE) +
+  autolayer(atm1_test, series="Actual") + 
+  ggtitle("ATM 1 - Seasonal ARIMA(1,1,2)(0,1,1)")
 ```
 
-
-
-```{r}
-fit <- auto.arima(atm1_train, seasonal = TRUE)
-atm1_forecast_arima <- forecast(fit, h = 66)
-checkresiduals(fit)
-```
 `
 
 
 ```{r}
-fit <- auto.arima(atm2_train, seasonal = TRUE)
+fit <- Arima(atm2_train, order=c(2,1,2), seasonal=c(1,1,1))
 atm2_forecast_arima <- forecast(fit, h = 66)
 checkresiduals(fit)
+autoplot(atm2_train) +
+  autolayer(atm2_forecast_arima, series="ARIMA Prediction", PI=FALSE) +
+  autolayer(atm2_test, series="Actual") + 
+  ggtitle("ATM 2 - Seasonal ARIMA(2,1,2)(1,1,1)")
 ```
 
+
+
+
+
 ```{r}
-fit <- auto.arima(atm4_train, seasonal = TRUE)
+fit <- Arima(atm4_train, order=c(1,1,1), seasonal=c(1,0,0))
 atm4_forecast_arima <- forecast(fit, h = 66)
 checkresiduals(fit)
+autoplot(atm4_train) +
+  autolayer(atm4_forecast_arima, series="ARIMA Prediction", PI=FALSE) +
+  autolayer(atm4_test, series="Actual") + 
+  ggtitle("ATM 4 - Seasonal ARIMA")
 ```
 
 
 ## Model Selection
+
+To determine the best model for each ATM, we will use the RMSE and MAE calculated using the forecast and train set.
+
+For the ATM 1 prediction, the Exponential Smoothing model had the lowest error. 
 
 ```{r}
 accuracy(atm1_forecast_decomp, atm1_test)
@@ -212,6 +258,18 @@ accuracy(atm1_forecast_arima, atm1_test)
 ```
 
 
+A prediction csv file is created with May projections (h=31) on the full ATM1 dataset using exponential smoothing:
+
+```{r}
+atm_ts[,1] %>% 
+  tsclean() %>% 
+  hw(damped = TRUE, seasonal="multiplicative", h=31) %>%
+  write.csv("C:\\Users\\mkive\\Documents\\GitHub\\Predictive-Analytics\\Project 1\\Predictions\\atm1.csv", row.names = FALSE)
+```
+
+
+For the ATM 2 prediction, the ARIMA model had the lowest error. 
+
 ```{r}
 accuracy(atm2_forecast_decomp, atm2_test)
 accuracy(atm2_forecast_es, atm2_test)
@@ -219,13 +277,51 @@ accuracy(atm2_forecast_arima, atm2_test)
 ```
 
 
+A prediction csv file is created with May projections (h=31) on the full ATM2 dataset using ARIMA:
+
+```{r}
+atm_ts[,2] %>% 
+  tsclean() %>% 
+  Arima(order=c(2,1,2), seasonal=c(1,1,1)) %>% 
+  forecast(h = 31) %>% 
+  write.csv("C:\\Users\\mkive\\Documents\\GitHub\\Predictive-Analytics\\Project 1\\Predictions\\atm2.csv", row.names = FALSE)
+```
+
+
+
+For the ATM 4 prediction, the ARIMA model had the lowest error. 
+
 ```{r}
 accuracy(atm4_forecast_decomp, atm4_test)
 accuracy(atm4_forecast_es, atm4_test)
 accuracy(atm4_forecast_arima, atm4_test)
 ```
 
-## Model Evaluation
+
+A prediction csv file is created with May projections (h=31) on the full ATM4 dataset using ARIMA:
+
+```{r}
+atm_ts[,4] %>% 
+  tsclean() %>% 
+  Arima(order=c(1,1,1), seasonal=c(1,0,0)) %>% 
+  forecast(h = 31) %>% 
+  write.csv("C:\\Users\\mkive\\Documents\\GitHub\\Predictive-Analytics\\Project 1\\Predictions\\atm4.csv", row.names = FALSE)
+```
+
+
+
+Finally, for the ATM 3 prediction, which only has non-zero datapoints, a prediction will be created using a random walk with drift.
+
+```{r}
+atm3_forecast <- rwf(atm_ts[,3], h = 31, drift=TRUE)
+autoplot(atm_ts[,3]) + autolayer(atm3_forecast) + ggtitle("ATM 3 - Random Walk with Drift")
+
+atm_ts[,3] %>% 
+  tsclean() %>% 
+  rwf(h = 31, drift=TRUE) %>% 
+  forecast(h = 31) %>% 
+  write.csv("C:\\Users\\mkive\\Documents\\GitHub\\Predictive-Analytics\\Project 1\\Predictions\\atm3.csv", row.names = FALSE)
+```
 
 
 
@@ -242,39 +338,167 @@ df <- readxl::read_xlsx(tf)
 
 ## Data Exploration
 
+Since there were a few missing values and an outlier in the dataset, the tsclean function can be used to address these issues. A comparison of the time series before and after `tsclean()` is shown below.
+
 ```{r}
 kwh <- ts(df$KWH, frequency = 12, start = c(1998, 1))
-kwh %>% tsclean() %>% autoplot()
+autoplot(kwh, series = 'original') + 
+  autolayer(kwh %>% tsclean(), series = 'clean')
 ```
 
+
+Looking at the seasonplot for this time series, it is evident that the energy consumption is highly seasonal, peaking in January and July - August of each year.
 
 ```{r}
-kwh %>% tsclean() %>% ggseasonplot(polar = TRUE)
+kwh <- kwh %>% tsclean()
+kwh %>% ggseasonplot(polar = TRUE)
 ```
 
 
-## Model Selection
-
+Before applying any models, a test train split of the dataset should be created to evaluate the performance of the forecast.
 
 ```{r}
-fit <- auto.arima(kwh %>% tsclean(), seasonal = TRUE)
-kwh_FIT <- forecast(fit, h = 66)
-checkresiduals(kwh_FIT)
+kwh_train <- subset(kwh, end = length(kwh)- 13)
+kwh_test <- subset(kwh, start = length(kwh) - 12)
 ```
+
+
+
+## ARIMA
+
+To apply ARIMA to the electric consumption time series, the data must be stationary. A unit root test reveals that the data is stationary after being differenced at lag = 12.
 
 ```{r}
-autoplot(kwh_FIT)
+kwh_train %>% diff(12) %>% ur.kpss() %>% summary()
 ```
 
 
-## Model Evaluation
+
+
+
+The ACF and PACF plots of kwh consumption below show high autocorrelation at lag = 1 and at lag = 12. Since both the ACF and PACF plots show autocorrelations outside of acceptable ranges, the ARIMA model will require both an autoregressive part and a moving average part.
+
+```{r}
+ggtsdisplay(kwh_train)
+```
+
+
+Applying auto arima to the model is sufficient - the Ljung-Box test has a high p-value above the significance level and the autocorrelations fall within the allowed interval. Requirements of both an autoregressive and moving average part are met. 
+
+```{r}
+fit <- auto.arima(kwh_train, seasonal = TRUE)
+kwh_arima <- forecast(fit, h = 12)
+checkresiduals(kwh_arima)
+```
+
+
+The actual values and predicted values seem to be very consistent, based on the plot below.
+
+```{r}
+autoplot(kwh_train) +
+  autolayer(kwh_arima, series="ARIMA Prediction", PI = FALSE) +
+  autolayer(kwh_test, series="Actuals") +
+  ggtitle("ATM 2 - Seasonal ARIMA(3,0,2)(2,1,0)")
+```
+
+
+Now, the full kwh data can be used to make a prediction for 2011.
+
+```{r}
+kwh %>% 
+  Arima(order=c(3,0,2), seasonal=c(2,1,0)) %>% 
+  forecast(h = 12) %>% 
+  write.csv("C:\\Users\\mkive\\Documents\\GitHub\\Predictive-Analytics\\Project 1\\Predictions\\kwh.csv", row.names = FALSE)
+```
 
 # Part C
 
-Part C consists of two data sets.  These are simple 2 columns sets, however they have different time stamps.  Your optional assignment is to time-base sequence the data and aggregate based on hour (example of what this looks like, follows).  Note for multiple recordings within an hour, take the mean.  Then to determine if the data is stationary and can it be forecast.  If so, provide a week forward forecast and present results via Rpubs and .rmd and the forecast in an Excel readable file.   
+Part C consists of two data sets.  These are simple 2 columns sets, however they have different time stamps.  Your optional assignment is to time-base sequence the data and aggregate based on hour (example of what this looks like, follows).  Note for multiple recordings within an hour, take the mean.  Then to determine if the data is stationary and can it be forecast.  If so, provide a week forward forecast and present results via Rpubs and .rmd and the forecast in an Excel readable file. 
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+url1 = "https://github.com/mkivenson/Predictive-Analytics/blob/master/Project%201/Waterflow_Pipe1.xlsx?raw=true"
+GET(url1, write_disk(tf <- tempfile(fileext = ".xlsx")))
+df1 <- readxl::read_xlsx(tf, col_types = c("date", "numeric"))
+
+url2 = "https://github.com/mkivenson/Predictive-Analytics/blob/master/Project%201/Waterflow_Pipe2.xlsx?raw=true"
+GET(url2, write_disk(tf <- tempfile(fileext = ".xlsx")))
+df2 <- readxl::read_xlsx(tf, col_types = c("date", "numeric"))
+```
+```{r}
+datatable(df1)
+```
+
+```{r}
+datatable(df2)
+```
+
+
+
+Looking at the two datasets, it seems like the two time series are the same measurement taken at two time intervals. The two time series will be joined, then grouped by mean water flow by hour.
+
+
+```{r}
+df1$Date = date(df1[[1]])
+df1$Hour = hour(df1[[1]])
+df1 <-df1 %>% 
+  group_by(Date, Hour) %>% 
+  summarise(WaterFlow = mean(WaterFlow)) %>% 
+  ungroup %>% 
+  mutate(`Date Time` = ymd_h(paste(Date, Hour))) %>% 
+  select(`Date Time`, WaterFlow)
+
+df <- bind_rows(df1, df2)
+df$Date = date(df[[1]])
+df$Hour = hour(df[[1]])
+wfts <- df %>% group_by(Date, Hour) %>% summarise(wf = sum(WaterFlow))
+wfts <- ts(wfts$wf)
+autoplot(wfts)
+```
+
 
 ## Data Exploration
 
-## Model Selection
+Now that the data is aggregated and the behavior of the time series is visible, it is possible to determine if it is stationary.
+Just from the appearance of the plot, it is unlikely to be stationary because the variance changes after the first 10 time periods. 
 
-## Model Evaluation
+A KPSS Unit root tests confirms that the time series is not stationary - the test statistic is much higher than the significance levels.
+
+```{r}
+wfts %>% ur.kpss() %>% summary()
+```
+
+However, after differencing once at lag = 1, the time series becomes stationary.
+
+```{r}
+wfts %>% diff() %>% ur.kpss() %>% summary()
+```
+
+
+```{r}
+wf_stationary <-  wfts %>% diff()
+autoplot(wf_stationary) + ggtitle("Stationary Water Flow Time Series")
+```
+
+
+
+## Model
+
+Since the data does not appear to be seasonal but stationarity has been confirmed, a non-seasonal ARIMA model will be used to forecast the next week of water flow
+
+The auto arima model seems sufficient for this forecast - autocorrelations at most lags are within the acceptable interval, and the Ljung-Box test p-value is above the significance level.
+
+```{r}
+fit <- auto.arima(wfts, seasonal = FALSE)
+wfts_arima <- forecast(fit, h = 7 * 24)
+checkresiduals(wfts_arima)
+```
+
+
+Since the ARIMA(1, 1, 3) is idea for this dataset, the following chart shows the prediction created with this model. These predictions have also been generated to a csv file. 
+
+```{r}
+wfts %>% 
+  Arima(order=c(1, 1, 3)) %>% 
+  forecast(h = 7 * 24) %>% 
+  write.csv("C:\\Users\\mkive\\Documents\\GitHub\\Predictive-Analytics\\Project 1\\Predictions\\waterflow.csv", row.names = FALSE)
+```

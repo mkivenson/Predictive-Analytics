@@ -1,0 +1,291 @@
+---
+title: "Assignment 7"
+author: "Mary Anna Kivenson"
+date: "April 5, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(caret)
+library(pls)
+library(tidyverse)
+library(AppliedPredictiveModeling)
+library(corrplot)
+```
+
+
+# Assignment 7 - Linear Regression
+
+## Question 6.2
+
+Developing a model to predict permeability (see Sect. 1.4) could save significant resources for a pharmaceutical company, while at the same time more
+rapidly identifying molecules that have a sufficient permeability to become a drug:
+
+a) Start R and use these commands to load the data:
+
+```{r}
+data(permeability)
+```
+
+The matrix `fingerprints` contains the 1,107 binary molecular predictors for the 165 compounds, while `permeability` contains permeability
+response.
+
+
+b) The fingerprint predictors indicate the presence or absence of substructures of a molecule and are often sparse meaning that relatively few of the
+molecules contain each substructure. Filter out the predictors that have low frequencies using the `nearZeroVar` function from the caret package.
+How many predictors are left for modeling?
+
+The `nearZeroVar` function helps remove any sparse and unbalanced variables using the following criteria:
+
+- The fraction of unique values over the sample size is low (say 10 %).
+- The ratio of the frequency of the most prevalent value to the frequency of
+the second most prevalent value is large (say around 20).
+
+```{r}
+fingerprints <- as.data.frame(fingerprints)
+print(paste('Total predictors:', ncol(fingerprints)))
+print(paste('Non-Sparse predictors:', ncol(fingerprints[, -nearZeroVar(fingerprints)])))
+```
+
+
+
+c) Split the data into a training and a test set, pre-process the data, and tune a PLS model. How many latent variables are optimal and what is
+the corresponding resampled estimate of R2?
+
+```{r}
+#preprocessing
+fingerprints <- fingerprints[, -nearZeroVar(fingerprints)]
+
+# test train split
+set.seed(0)
+smp_size <- floor(0.8 * nrow(fingerprints))
+train_ind <- sample(seq_len(nrow(fingerprints)), size = smp_size)
+
+Xtrain <- fingerprints[train_ind, ]
+Xtest <- fingerprints[-train_ind, ]
+
+ytrain <- permeability[train_ind, ]
+ytest <- permeability[-train_ind, ]
+```
+
+
+```{r}
+#model
+set.seed(0)
+plsTune <- train(Xtrain, 
+                 ytrain,
+                 method = "pls",
+                 tuneLength = 30,
+                 preProc = c("center", "scale"),
+                 trControl =  trainControl(method = 'cv', 10))
+```
+
+
+
+```{r}
+plot(plsTune)
+lv <- which.min(plsTune$results$RMSE)
+paste("According to the scree plot, the ideal amount of latent variables is", lv)
+```
+
+
+```{r}
+print(paste('The R-squared corresponding to', lv, 'latent variables is', plsTune$results[lv,3]))
+```
+
+
+d) Predict the response for the test set. What is the test set estimate of R2?
+
+
+```{r}
+pls_pred <- predict(plsTune, Xtest)
+plot(pls_pred, ytest, main=paste("Predicted vs Observed Permeability, PLS Model with", lv, "Components"), xlab="Predicted", ylab="Actual")
+```
+
+```{r}
+print(paste('R-squared with PLS model for the test set is', cor(ytest, pls_pred) ^ 2))
+```
+
+
+
+e) Try building other models discussed in this chapter. Do any have better
+predictive performance?
+
+Other models discussed in this chapter include penalized regression models. Ridge regression and elastic net models have been fit to the dataset, however the R-squared values produced by these models are less than the PLS model R-squared.
+
+
+```{r}
+set.seed(0)
+ridgeGrid <- data.frame(.lambda = seq(0, .1, length = 20))
+ridgeTune <- train(Xtrain, 
+                 ytrain,
+                 method = "ridge",
+                 tuneGrid = ridgeGrid,
+                 trControl = trainControl(method = 'cv', 10),
+                 preProc = c("center", "scale"))
+
+ridge_pred <- predict(ridgeTune, Xtest)
+print(paste('R-squared with Ridge regression for the test set is', cor(ytest, ridge_pred) ^ 2))
+```
+
+```{r}
+set.seed(0)
+enetGrid <- expand.grid(lambda = c(0, 0.01, .1), fraction = seq(.05, 1, length = 20))
+enetTune <- train(Xtrain, 
+                 ytrain,
+                 method = "enet",
+                 tuneGrid = enetGrid,
+                 trControl = trainControl(method = 'cv', 10),
+                 preProc = c("center", "scale"))
+
+enet_pred <- predict(enetTune, Xtest)
+print(paste('R-squared with Elastic Net regression for the test set is', cor(ytest, enet_pred) ^ 2))
+```
+
+
+f) Would you recommend any of your models to replace the permeability
+laboratory experiment?
+
+I would not recommend any of these models to replace the permeability laboratory experiment, because the R-squared values indicate that the models explain little of the varaiability of the permeability data.
+
+
+## Question 6.3
+
+A chemical manufacturing process for a pharmaceutical product was discussed in Sect. 1.4. 
+In this problem, the objective is to understand the relationship between biological measurements of the raw materials (predictors), measurements of the manufacturing process (predictors), and the response of
+product yield. Biological predictors cannot be changed but can be used to assess the quality of the raw material before processing. On the other hand,
+manufacturing process predictors can be changed in the manufacturing process. Improving product yield by 1 % will boost revenue by approximately one hundred thousand dollars per batch:
+
+a) Start R and use these commands to load the data:
+
+```{r}
+data(ChemicalManufacturingProcess)
+```
+
+The matrix `processPredictors` contains the 57 predictors (12 describing
+the input biological material and 45 describing the process predictors)
+for the 176 manufacturing runs. `yield` contains the percent yield for each
+run.
+
+b) A small percentage of cells in the predictor set contain missing values. Use
+an imputation function to fill in these missing values (e.g., see Sect. 3.8).
+
+
+Before imputing the data, feature BiologicalMaterial07 will be removed because it has 0 variance. 
+
+```{r}
+cmp <- ChemicalManufacturingProcess[, -nearZeroVar(ChemicalManufacturingProcess)]
+print(paste('Total predictors:', ncol(ChemicalManufacturingProcess)))
+print(paste('Non-Sparse predictors:', ncol(ChemicalManufacturingProcess[, -nearZeroVar(ChemicalManufacturingProcess)])))
+```
+
+kNN imputation will be used to fill the missing values in the dataset.
+
+
+```{r}
+cmp <- preProcess(as.data.frame(cmp), method = "knnImpute", k = 10)$data
+```
+
+
+c) Split the data into a training and a test set, pre-process the data, and
+tune a model of your choice from this chapter. What is the optimal value
+of the performance metric?
+
+
+```{r}
+# test train split
+set.seed(0)
+smp_size <- floor(0.8 * nrow(cmp))
+train_ind <- sample(seq_len(nrow(cmp)), size = smp_size)
+
+Xtrain <- cmp[train_ind, -1]
+Xtest <- cmp[-train_ind, -1]
+
+ytrain <- cmp[train_ind, 1]
+ytest <- cmp[-train_ind, 1]
+```
+
+
+
+Looking at the histograms of the features of the training dataset, there are features with skewed distributions. The `skewness` function confirms the skewness in the features of this dataset. The data will centered and scaled to address this.
+
+```{r fig.width= 10}
+library(psych)
+library(e1071)
+multi.hist(Xtrain, main = '', bcol = 'blue')
+head(sort(apply(Xtrain, 2, skewness)), 8)
+tail(sort(apply(Xtrain, 2, skewness)), 2)
+```
+
+
+```{r}
+#model
+set.seed(0)
+plsTune <- train(Xtrain, 
+                 ytrain,
+                 method = "pls",
+                 tuneLength = 30,
+                 preProc = c("center", "scale"),
+                 trControl =  trainControl(method = 'cv', 10))
+```
+
+
+
+```{r}
+plot(plsTune)
+lv <- which.min(plsTune$results$RMSE)
+paste("According to the scree plot, the optimal value of latent variables is", lv)
+```
+
+
+```{r}
+print(paste('Train set R-squared with PLS model with', lv, 'latent variables is', plsTune$results[lv,3]))
+```
+
+d) Predict the response for the test set. What is the value of the performance
+metric and how does this compare with the resampled performance metric
+on the training set?
+
+The test set r-squared is slightly lower than the performance metric on the training set.
+
+```{r}
+pls_pred <- predict(plsTune, Xtest)
+print(paste('Test set R-squared with PLS model is', cor(ytest, pls_pred) ^ 2))
+```
+
+e) Which predictors are most important in the model you have trained? Do
+either the biological or process predictors dominate the list?
+
+The most important predictors are ManufacturingProcess09, ManufacturingProcess13, ManufacturingProcess32, ManufacturingProcess17, and ManufacturingProcess36. The top 20 predictors have a 60-40 ratio of Manufacturing to Biological features. The top five predictors are all process predictors. 
+
+```{r fig}
+plot(varImp(plsTune), top = 10)
+```
+
+
+f) Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future
+runs of the manufacturing process?
+
+Relationships between the top 5 predictors and Yield:
+
+- The relationship between ManufacturingProcess09 and yield is strong and positive
+- The relationship between ManufacturingProcess13 and yield is strong and negative
+- The relationship between ManufacturingProcess32 and yield is moderate and positive
+- The relationship between ManufacturingProcess17 and yield is moderate and negative
+- The relationship between ManufacturingProcess36 and yield is moderate and negative
+
+There is also significant correlation between predictors. This information can be helpful in improving yield in future runs, top processes with negative correlations with yield can be reduced and features with positive correlations can be enhanced.
+
+```{r}
+cmp %>% 
+  select(c('ManufacturingProcess09','ManufacturingProcess13','ManufacturingProcess32','ManufacturingProcess17','ManufacturingProcess36',
+           'BiologicalMaterial02', 'BiologicalMaterial03', 'BiologicalMaterial06', 'ManufacturingProcess06', 'BiologicalMaterial04', 'Yield')) %>%
+  cor() %>%
+  corrplot(method = 'circle')
+```
+
+

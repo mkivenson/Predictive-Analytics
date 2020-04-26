@@ -1,5 +1,5 @@
 ---
-title: "Assignment9"
+title: "Assignment 9"
 author: "Mary Anna Kivenson"
 date: "April 26, 2020"
 output: html_document
@@ -15,7 +15,6 @@ library(party)
 library(tidyverse)
 ```
 
-# Assignment 9
 
 Do problems 8.1, 8.2, 8.3, and 8.7 in Kuhn and Johnson.
 

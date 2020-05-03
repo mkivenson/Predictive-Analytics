@@ -1,0 +1,136 @@
+---
+title: "Data 624 Project 2"
+author: "Mary Anna Kivenson"
+date: "May 3, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(RANN)
+```
+
+## Data
+
+```{r}
+train <- read.csv("https://raw.githubusercontent.com/mkivenson/Predictive-Analytics/master/Project%202/Datasets/student_train.csv")
+test <- read.csv("https://raw.githubusercontent.com/mkivenson/Predictive-Analytics/master/Project%202/Datasets/student_test.csv")
+```
+
+
+
+```{r}
+head(train)
+```
+
+
+#### Summary
+
+First, we take a look at a summary of the data. 
+
+- There are missing values in all of the predictors except for `Pressure.Vacuum` and `Air.Pressurer`
+- The target variabale, `PH`, has four missing values that should be removed from the training data
+- All predictors except for `Brand.Code` are numeric - `Brand.Code` will be encoded into dummy variables
+
+```{r}
+summary(train)
+train <- drop_na(train, "PH") #remove rows without a PH value
+```
+
+
+
+
+
+### Preprocessing
+
+#### Split
+
+```{r}
+X_train <- subset(train, select = -c(PH))
+y_train <- train$PH
+X_test <- subset(test, select = -c(PH))
+y_test <- test$PH
+```
+
+
+#### Encoding
+
+```{r}
+X_train$Brand.A <- ifelse(X_train$Brand.Code == 'A', 1, 0)
+X_train$Brand.B <- ifelse(X_train$Brand.Code == 'B', 1, 0)
+X_train$Brand.C <- ifelse(X_train$Brand.Code == 'C', 1, 0)
+X_train$Brand.D <- ifelse(X_train$Brand.Code == 'D', 1, 0)
+X_train <- subset(X_train, select = -c(Brand.Code))
+head(X_train)
+```
+
+
+```{r}
+aggr(train[,sapply(train, is.numeric)], col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(train), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+
+
+
+```{r}
+result <- preProcess(X_train, method = c("knnImpute"), k = 10)
+X_train <- predict(result, X_train)
+head(X_train)
+```
+
+```{r}
+library(corrplot)
+corrplot(cor(result$data, use = "complete.obs"), method="color", type="lower", tl.col = "black", tl.srt = 5)
+```
+
+
+
+### PCA
+
+```{r}
+rlmPCA <- train(X_train, y_train,
+                method = "rlm",
+                preProcess = "pca",
+                trControl = trainControl(method = "cv"))
+rlmPCA 
+```
+
+
+
+
+### PLS
+
+
+```{r}
+plsTune <- train(X_train, y_train, 
+                 method = "pls", 
+                 tuneLength = 20,
+                 trControl = trainControl(method = "cv"),
+                 preProc = c("center", "scale"))
+plsTune
+```
+
+
+```{r}
+library(mlbench)
+
+ridgeGrid <- data.frame(.lambda = seq(0, .1, length = 15))
+ridgeRegFit <- train(X_train, y_train,
+                     method = "ridge", 
+                     tuneGrid = ridgeGrid, 
+                     trControl = trainControl(method = "cv"),
+                     preProc = c("center", "scale"))
+ridgeRegFit 
+```
+
+```{r}
+svmRTuned  <- train(X_train, y_train,
+                 method = "svmRadial",
+                 #preProc = c("center", "scale"), 
+                 tuneLength = 14,
+                 trControl = trainControl(method = "cv"))
+svmRTuned
+```
+
+
+

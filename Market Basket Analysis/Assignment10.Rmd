@@ -1,0 +1,50 @@
+---
+title: "Market Basket Analysis"
+author: "Mary Anna Kivenson"
+date: "May 3, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+Imagine 10000 receipts sitting on your table. Each receipt represents a transaction with items that were purchased. The receipt is a representation of stuff that went into a customer’s basket - and therefore ‘Market Basket Analysis’. That is exactly what the Groceries Data Set contains: a collection of receipts with each line representing 1 receipt and the items purchased. Each line is called a transaction and each column in a row represents an item. The data set is attached.
+
+Your assignment is to use R to mine the data for association rules. You should report support, confidence and lift and your top 10 rules by lift. 
+
+```{r message=FALSE, warning=FALSE}
+library(plyr)
+library(tidyr)
+library(readxl)
+library(knitr)
+library(ggplot2)
+library(lubridate)
+library(arules)
+library(arulesViz)
+```
+
+
+
+#### Load Data
+
+```{r}
+df <- read.transactions("https://raw.githubusercontent.com/mkivenson/Predictive-Analytics/master/Market%20Basket%20Analysis/GroceryDataSet.csv", header = FALSE, sep = ",")
+```
+
+
+
+
+
+#### Use `arules` to return top 10 rules by lift
+
+```{r eval=TRUE, message=TRUE, warning=TRUE}
+rules <- apriori(df, parameter = list(supp = 0.001, conf = 0.8))
+```
+
+
+```{r}
+inspect(rules[0:10])
+```
